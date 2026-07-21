@@ -51,6 +51,10 @@ npm run start:dev
 | `npm run test` | Unit tests |
 | `npm run test:e2e` | E2E tests |
 
+## Deploy
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for Docker, OpsCtrl, and production checklist.
+
 ## Related
 
 Frontend: [FE-SaaS-Project](https://github.com/febrianrachmat/FE-SaaS-Project)
