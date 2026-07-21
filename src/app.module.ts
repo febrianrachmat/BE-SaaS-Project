@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { ProjectModule } from './modules/project/project.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { CollabModule } from './modules/collab/collab.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     WorkspaceModule,
     ProjectModule,
     DashboardModule,
+    CollabModule,
   ],
   providers: [
     {
