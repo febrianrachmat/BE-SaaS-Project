@@ -1,0 +1,509 @@
+// FlowPilot — Production Prisma Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum WorkspaceRole {
+  GUEST
+  MEMBER
+  PROJECT_MANAGER
+  ADMIN
+  OWNER
+}
+
+enum SystemRole {
+  USER
+  SYSTEM_ADMIN
+}
+
+enum ProjectVisibility {
+  PRIVATE
+  WORKSPACE
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  REVIEW
+  TESTING
+  DONE
+  CANCELED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_UPDATED
+  COMMENT_ADDED
+  MENTION
+  INVITATION
+  DUE_SOON
+  COMPLETED
+  ROLE_CHANGED
+  WORKSPACE_INVITE
+}
+
+enum ActivityAction {
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_DELETED
+  TASK_STATUS_CHANGED
+  TASK_ASSIGNED
+  COMMENT_ADDED
+  COMMENT_DELETED
+  MEMBER_JOINED
+  MEMBER_LEFT
+  ROLE_CHANGED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_ARCHIVED
+  WORKSPACE_CREATED
+  WORKSPACE_UPDATED
+  INVITATION_SENT
+  FILE_UPLOADED
+  FILE_DELETED
+}
+
+// ─── Auth & Users ────────────────────────────────────────────────────────────
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique
+  passwordHash    String     @map("password_hash")
+  name            String
+  avatarUrl       String?    @map("avatar_url")
+  bio             String?
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  systemRole      SystemRole @default(USER) @map("system_role")
+  timezone        String     @default("UTC")
+  locale          String     @default("en")
+  theme           String     @default("system")
+  deletedAt       DateTime?  @map("deleted_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  sessions              Session[]
+  refreshTokens         RefreshToken[]
+  emailVerifications    EmailVerification[]
+  passwordResets        PasswordReset[]
+  workspaceMemberships  WorkspaceMember[]
+  projectMemberships    ProjectMember[]
+  ownedWorkspaces       Workspace[]         @relation("WorkspaceOwner")
+  reportedTasks         Task[]              @relation("TaskReporter")
+  assignedTasks         Task[]              @relation("TaskAssignee")
+  comments              Comment[]
+  attachments           Attachment[]
+  notifications         Notification[]
+  activities            ActivityLog[]       @relation("ActivityActor")
+  sentInvitations       Invitation[]        @relation("InvitationInviter")
+  favorites             ProjectFavorite[]
+  notificationPrefs     NotificationPreference?
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Session {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  userAgent String?   @map("user_agent")
+  ip        String?
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  familyId     String    @map("family_id") @db.Uuid
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+  userAgent    String?   @map("user_agent")
+  ip           String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model EmailVerification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verifications")
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+// ─── Workspace ───────────────────────────────────────────────────────────────
+
+model Workspace {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String    @unique
+  description String?
+  logoUrl     String?   @map("logo_url")
+  timezone    String    @default("UTC")
+  ownerId     String    @map("owner_id") @db.Uuid
+  archivedAt  DateTime? @map("archived_at")
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  owner       User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members     WorkspaceMember[]
+  projects    Project[]
+  invitations Invitation[]
+  labels      Label[]
+  activities  ActivityLog[]
+  notifications Notification[]
+
+  @@index([ownerId])
+  @@index([deletedAt])
+  @@index([archivedAt])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  role        WorkspaceRole @default(MEMBER)
+  joinedAt    DateTime      @default(now()) @map("joined_at")
+  deletedAt   DateTime?     @map("deleted_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([role])
+  @@map("workspace_members")
+}
+
+model Invitation {
+  id          String           @id @default(uuid()) @db.Uuid
+  workspaceId String           @map("workspace_id") @db.Uuid
+  email       String
+  role        WorkspaceRole    @default(MEMBER)
+  tokenHash   String           @unique @map("token_hash")
+  status      InvitationStatus @default(PENDING)
+  invitedById String           @map("invited_by_id") @db.Uuid
+  expiresAt   DateTime         @map("expires_at")
+  acceptedAt  DateTime?        @map("accepted_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("InvitationInviter", fields: [invitedById], references: [id])
+
+  @@index([workspaceId, email])
+  @@index([status])
+  @@map("invitations")
+}
+
+// ─── Project ─────────────────────────────────────────────────────────────────
+
+model Project {
+  id          String            @id @default(uuid()) @db.Uuid
+  workspaceId String            @map("workspace_id") @db.Uuid
+  name        String
+  slug        String
+  description String?
+  coverUrl    String?           @map("cover_url")
+  icon        String?
+  visibility  ProjectVisibility @default(WORKSPACE)
+  status      ProjectStatus     @default(ACTIVE)
+  priority    ProjectPriority   @default(MEDIUM)
+  deadline    DateTime?
+  archivedAt  DateTime?         @map("archived_at")
+  deletedAt   DateTime?         @map("deleted_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  members     ProjectMember[]
+  tasks       Task[]
+  favorites   ProjectFavorite[]
+  activities  ActivityLog[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, status])
+  @@index([deletedAt])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String    @id @default(uuid()) @db.Uuid
+  projectId String    @map("project_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+model ProjectFavorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @map("project_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_favorites")
+}
+
+// ─── Task ────────────────────────────────────────────────────────────────────
+
+model Task {
+  id            String       @id @default(uuid()) @db.Uuid
+  projectId     String       @map("project_id") @db.Uuid
+  parentId      String?      @map("parent_id") @db.Uuid
+  title         String
+  description   String?      @db.Text
+  status        TaskStatus   @default(BACKLOG)
+  priority      TaskPriority @default(MEDIUM)
+  storyPoints   Int?         @map("story_points")
+  estimatedMins Int?         @map("estimated_mins")
+  actualMins    Int?         @map("actual_mins")
+  dueDate       DateTime?    @map("due_date")
+  position      Float        @default(0)
+  reporterId    String       @map("reporter_id") @db.Uuid
+  assigneeId    String?      @map("assignee_id") @db.Uuid
+  completedAt   DateTime?    @map("completed_at")
+  deletedAt     DateTime?    @map("deleted_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent      Task?            @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks    Task[]           @relation("Subtasks")
+  reporter    User             @relation("TaskReporter", fields: [reporterId], references: [id])
+  assignee    User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  labels      TaskLabel[]
+  comments    Comment[]
+  attachments Attachment[]
+  checklist   ChecklistItem[]
+  activities  ActivityLog[]
+
+  @@index([projectId, status])
+  @@index([assigneeId])
+  @@index([dueDate])
+  @@index([parentId])
+  @@index([position])
+  @@index([deletedAt])
+  @@map("tasks")
+}
+
+model Label {
+  id          String  @id @default(uuid()) @db.Uuid
+  workspaceId String  @map("workspace_id") @db.Uuid
+  name        String
+  color       String  @default("#3B82F6")
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks     TaskLabel[]
+
+  @@unique([workspaceId, name])
+  @@map("labels")
+}
+
+model TaskLabel {
+  taskId  String @map("task_id") @db.Uuid
+  labelId String @map("label_id") @db.Uuid
+
+  task  Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@map("task_labels")
+}
+
+model ChecklistItem {
+  id        String    @id @default(uuid()) @db.Uuid
+  taskId    String    @map("task_id") @db.Uuid
+  title     String
+  isDone    Boolean   @default(false) @map("is_done")
+  position  Int       @default(0)
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("checklist_items")
+}
+
+model Comment {
+  id        String    @id @default(uuid()) @db.Uuid
+  taskId    String    @map("task_id") @db.Uuid
+  authorId  String    @map("author_id") @db.Uuid
+  body      String    @db.Text
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([taskId])
+  @@index([authorId])
+  @@map("comments")
+}
+
+model Attachment {
+  id           String    @id @default(uuid()) @db.Uuid
+  taskId       String    @map("task_id") @db.Uuid
+  uploadedById String    @map("uploaded_by_id") @db.Uuid
+  fileName     String    @map("file_name")
+  fileKey      String    @map("file_key")
+  mimeType     String    @map("mime_type")
+  sizeBytes    Int       @map("size_bytes")
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@map("attachments")
+}
+
+// ─── Notifications & Activity ────────────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  workspaceId String?          @map("workspace_id") @db.Uuid
+  type        NotificationType
+  title       String
+  body        String?
+  data        Json?
+  readAt      DateTime?        @map("read_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id              String  @id @default(uuid()) @db.Uuid
+  userId          String  @unique @map("user_id") @db.Uuid
+  emailEnabled    Boolean @default(true) @map("email_enabled")
+  inAppEnabled    Boolean @default(true) @map("in_app_enabled")
+  taskAssigned    Boolean @default(true) @map("task_assigned")
+  taskUpdated     Boolean @default(true) @map("task_updated")
+  commentAdded    Boolean @default(true) @map("comment_added")
+  mention         Boolean @default(true)
+  invitation      Boolean @default(true)
+  dueSoon         Boolean @default(true) @map("due_soon")
+  completed       Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model ActivityLog {
+  id          String         @id @default(uuid()) @db.Uuid
+  workspaceId String         @map("workspace_id") @db.Uuid
+  projectId   String?        @map("project_id") @db.Uuid
+  taskId      String?        @map("task_id") @db.Uuid
+  actorId     String         @map("actor_id") @db.Uuid
+  action      ActivityAction
+  metadata    Json?
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  actor     User      @relation("ActivityActor", fields: [actorId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([projectId])
+  @@index([taskId])
+  @@index([actorId])
+  @@map("activity_logs")
+}
