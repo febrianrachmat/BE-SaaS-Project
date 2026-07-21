@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsEnum,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -142,6 +143,29 @@ export class UpdateTaskDto {
   @IsArray()
   @IsUUID('4', { each: true })
   labelIds?: string[];
+}
+
+export class MoveTaskDto {
+  @ApiProperty({ enum: TaskStatus })
+  @IsEnum(TaskStatus)
+  status!: TaskStatus;
+
+  @ApiProperty({
+    description: 'Fractional index position within the target column',
+  })
+  @Type(() => Number)
+  @IsNumber()
+  position!: number;
+}
+
+export class CalendarQueryDto {
+  @ApiProperty({ example: '2026-07-01' })
+  @IsDateString()
+  from!: string;
+
+  @ApiProperty({ example: '2026-07-31' })
+  @IsDateString()
+  to!: string;
 }
 
 export class TaskQueryDto {

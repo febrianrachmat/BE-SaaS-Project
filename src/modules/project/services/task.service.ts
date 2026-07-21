@@ -8,6 +8,8 @@ import {
   CreateChecklistItemDto,
   CreateLabelDto,
   CreateTaskDto,
+  CalendarQueryDto,
+  MoveTaskDto,
   TaskQueryDto,
   UpdateChecklistItemDto,
   UpdateTaskDto,
@@ -202,6 +204,69 @@ export class TaskService {
     });
 
     return { message: 'Task deleted' };
+  }
+
+  async move(
+    ctx: WorkspaceContext,
+    projectSlug: string,
+    taskId: string,
+    actorId: string,
+    dto: MoveTaskDto,
+  ): Promise<TaskDto> {
+    return this.update(ctx, projectSlug, taskId, actorId, {
+      status: dto.status,
+      position: dto.position,
+    });
+  }
+
+  async calendar(
+    ctx: WorkspaceContext,
+    query: CalendarQueryDto,
+  ): Promise<
+    Array<
+      TaskDto & {
+        project: { id: string; name: string; slug: string; icon: string | null };
+      }
+    >
+  > {
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    to.setHours(23, 59, 59, 999);
+
+    const rows = await this.prisma.task.findMany({
+      where: {
+        deletedAt: null,
+        parentId: null,
+        dueDate: { gte: from, lte: to },
+        project: {
+          workspaceId: ctx.workspaceId,
+          deletedAt: null,
+        },
+      },
+      include: {
+        reporter: {
+          select: { id: true, name: true, email: true, avatarUrl: true },
+        },
+        assignee: {
+          select: { id: true, name: true, email: true, avatarUrl: true },
+        },
+        labels: { include: { label: true } },
+        checklist: {
+          where: { deletedAt: null },
+          orderBy: { position: 'asc' },
+        },
+        _count: { select: { subtasks: { where: { deletedAt: null } } } },
+        project: {
+          select: { id: true, name: true, slug: true, icon: true },
+        },
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      ...toTaskDto(row),
+      project: row.project,
+    }));
   }
 
   async addChecklist(

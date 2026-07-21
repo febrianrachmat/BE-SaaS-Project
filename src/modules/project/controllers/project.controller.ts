@@ -22,6 +22,8 @@ import {
   CreateChecklistItemDto,
   CreateLabelDto,
   CreateTaskDto,
+  CalendarQueryDto,
+  MoveTaskDto,
   TaskQueryDto,
   UpdateChecklistItemDto,
   UpdateTaskDto,
@@ -166,6 +168,30 @@ export class ProjectController {
     @Body() dto: UpdateTaskDto,
   ) {
     return this.tasks.update(ctx, projectSlug, taskId, user.id, dto);
+  }
+
+  @Post('projects/:projectSlug/tasks/:taskId/move')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.TASK_UPDATE)
+  @ApiOperation({ summary: 'Move task on Kanban (status + position)' })
+  moveTask(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+    @Param('taskId') taskId: string,
+    @Body() dto: MoveTaskDto,
+  ) {
+    return this.tasks.move(ctx, projectSlug, taskId, user.id, dto);
+  }
+
+  @Get('calendar')
+  @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
+  @ApiOperation({ summary: 'List tasks with due dates in range' })
+  calendar(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Query() query: CalendarQueryDto,
+  ) {
+    return this.tasks.calendar(ctx, query);
   }
 
   @Delete('projects/:projectSlug/tasks/:taskId')
