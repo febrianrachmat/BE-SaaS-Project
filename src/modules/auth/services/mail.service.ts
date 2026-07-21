@@ -54,6 +54,23 @@ export class MailService {
     );
   }
 
+  async sendWorkspaceInviteEmail(
+    to: string,
+    workspaceName: string,
+    token: string,
+  ): Promise<void> {
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+    const link = `${frontendUrl}/invitations/accept?token=${token}`;
+    await this.send(
+      to,
+      `You're invited to ${workspaceName} on FlowPilot`,
+      `You've been invited to join "${workspaceName}" on FlowPilot.\n\nAccept invitation:\n${link}\n\nThis invite expires in 7 days.`,
+    );
+  }
+
   private async send(to: string, subject: string, text: string): Promise<void> {
     const from = this.config.get<string>(
       'MAIL_FROM',
