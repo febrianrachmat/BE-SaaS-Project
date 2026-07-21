@@ -7,6 +7,7 @@ import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { ProjectModule } from './modules/project/project.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { ProjectModule } from './modules/project/project.module';
     AuthModule,
     WorkspaceModule,
     ProjectModule,
+    DashboardModule,
   ],
   providers: [
     {
