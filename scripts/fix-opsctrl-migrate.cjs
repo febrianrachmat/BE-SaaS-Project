@@ -1,15 +1,22 @@
 /**
- * OpsCtrl migrate job runs `prisma migrate deploy`.
- * If a previous init attempt failed (P3009), mark it rolled back once then redeploy.
+ * Called by the Prisma CLI wrapper when OpsCtrl runs `prisma migrate deploy`.
+ * Clears P3009 (failed init) once, then reapplies migrations.
  */
 const { execSync } = require('node:child_process');
+const path = require('node:path');
 
-function run(cmd) {
-  execSync(cmd, { stdio: 'inherit', env: process.env });
+const prismaCli = require.resolve('prisma/build/index.js');
+
+function run(args) {
+  execSync(`node "${prismaCli}" ${args}`, {
+    stdio: 'inherit',
+    env: process.env,
+    cwd: path.join(__dirname, '..'),
+  });
 }
 
 try {
-  run('npx prisma migrate deploy');
+  run('migrate deploy');
   process.exit(0);
 } catch {
   console.warn(
@@ -18,9 +25,9 @@ try {
 }
 
 try {
-  run('npx prisma migrate resolve --rolled-back 20260721100000_init');
+  run('migrate resolve --rolled-back 20260721100000_init');
 } catch {
   console.warn('[migrate] resolve skipped (already resolved or missing)');
 }
 
-run('npx prisma migrate deploy');
+run('migrate deploy');
