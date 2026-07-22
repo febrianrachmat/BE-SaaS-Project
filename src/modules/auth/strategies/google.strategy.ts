@@ -13,9 +13,13 @@ export type GoogleProfilePayload = {
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(config: ConfigService) {
+    const clientID =
+      config.get<string>('GOOGLE_CLIENT_ID')?.trim() || 'unconfigured';
+    const clientSecret =
+      config.get<string>('GOOGLE_CLIENT_SECRET')?.trim() || 'unconfigured';
     super({
-      clientID: config.get<string>('GOOGLE_CLIENT_ID', ''),
-      clientSecret: config.get<string>('GOOGLE_CLIENT_SECRET', ''),
+      clientID,
+      clientSecret,
       callbackURL: config.get<string>(
         'GOOGLE_CALLBACK_URL',
         'http://localhost:4000/v1/auth/google/callback',
