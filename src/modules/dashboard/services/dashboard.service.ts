@@ -46,6 +46,8 @@ export type DashboardOverview = {
     createdAt: string;
     actor: { id: string; name: string; avatarUrl: string | null };
     metadata: unknown;
+    project: { id: string; name: string; slug: string } | null;
+    task: { id: string; title: string } | null;
   }>;
   memberActivity: Array<{
     userId: string;
@@ -190,6 +192,12 @@ export class DashboardService {
           actor: {
             select: { id: true, name: true, avatarUrl: true },
           },
+          project: {
+            select: { id: true, name: true, slug: true },
+          },
+          task: {
+            select: { id: true, title: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: 12,
@@ -292,6 +300,8 @@ export class DashboardService {
         createdAt: a.createdAt.toISOString(),
         actor: a.actor,
         metadata: a.metadata,
+        project: a.project,
+        task: a.task,
       })),
       memberActivity: memberActs.map((m) => {
         const actor = actorMap.get(m.actorId);
