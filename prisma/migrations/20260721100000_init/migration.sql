@@ -1,6 +1,39 @@
 ﻿-- CreateSchema
 CREATE SCHEMA IF NOT EXISTS "public";
 
+-- Clean partial objects from a previously failed init (safe for empty tenant DBs).
+DROP TABLE IF EXISTS "activity_logs" CASCADE;
+DROP TABLE IF EXISTS "notification_preferences" CASCADE;
+DROP TABLE IF EXISTS "notifications" CASCADE;
+DROP TABLE IF EXISTS "attachments" CASCADE;
+DROP TABLE IF EXISTS "comments" CASCADE;
+DROP TABLE IF EXISTS "checklist_items" CASCADE;
+DROP TABLE IF EXISTS "task_labels" CASCADE;
+DROP TABLE IF EXISTS "labels" CASCADE;
+DROP TABLE IF EXISTS "tasks" CASCADE;
+DROP TABLE IF EXISTS "project_favorites" CASCADE;
+DROP TABLE IF EXISTS "project_members" CASCADE;
+DROP TABLE IF EXISTS "projects" CASCADE;
+DROP TABLE IF EXISTS "invitations" CASCADE;
+DROP TABLE IF EXISTS "workspace_members" CASCADE;
+DROP TABLE IF EXISTS "workspaces" CASCADE;
+DROP TABLE IF EXISTS "password_resets" CASCADE;
+DROP TABLE IF EXISTS "email_verifications" CASCADE;
+DROP TABLE IF EXISTS "refresh_tokens" CASCADE;
+DROP TABLE IF EXISTS "sessions" CASCADE;
+DROP TABLE IF EXISTS "users" CASCADE;
+
+DROP TYPE IF EXISTS "ActivityAction" CASCADE;
+DROP TYPE IF EXISTS "NotificationType" CASCADE;
+DROP TYPE IF EXISTS "InvitationStatus" CASCADE;
+DROP TYPE IF EXISTS "TaskPriority" CASCADE;
+DROP TYPE IF EXISTS "TaskStatus" CASCADE;
+DROP TYPE IF EXISTS "ProjectPriority" CASCADE;
+DROP TYPE IF EXISTS "ProjectStatus" CASCADE;
+DROP TYPE IF EXISTS "ProjectVisibility" CASCADE;
+DROP TYPE IF EXISTS "SystemRole" CASCADE;
+DROP TYPE IF EXISTS "WorkspaceRole" CASCADE;
+
 -- CreateEnum
 CREATE TYPE "WorkspaceRole" AS ENUM ('GUEST', 'MEMBER', 'PROJECT_MANAGER', 'ADMIN', 'OWNER');
 
