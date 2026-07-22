@@ -41,6 +41,16 @@ export class MailService {
     );
   }
 
+  /** When SMTP is absent, still emit the link for OpsCtrl/runtime logs. */
+  logDevVerificationLink(to: string, token: string): void {
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+    const link = `${frontendUrl}/verify-email?token=${token}`;
+    this.logger.log(`[dev-mail] To: ${to} | Verify your FlowPilot email\n${link}`);
+  }
+
   async sendPasswordResetEmail(to: string, token: string): Promise<void> {
     const frontendUrl = this.config.get<string>(
       'FRONTEND_URL',

@@ -1,7 +1,5 @@
-import {
-  ConflictException,
-  Injectable,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   generateSecureToken,
   hashToken,
@@ -21,9 +19,12 @@ export class RegisterUseCase {
     private readonly emailVerifications: EmailVerificationRepository,
     private readonly passwords: PasswordService,
     private readonly mail: MailService,
+    private readonly config: ConfigService,
   ) {}
 
-  async execute(dto: RegisterDto): Promise<{ user: PublicUser; message: string }> {
+  async execute(
+    dto: RegisterDto,
+  ): Promise<{ user: PublicUser; message: string }> {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.users.findByEmail(email);
 
@@ -46,11 +47,22 @@ export class RegisterUseCase {
       addDuration(new Date(), '24h'),
     );
 
-    await this.mail.sendVerificationEmail(user.email, token);
+    const smtpConfigured = Boolean(this.config.get<string>('SMTP_HOST'));
+    if (smtpConfigured) {
+      await this.mail.sendVerificationEmail(user.email, token);
+      return {
+        user: toPublicUser(user),
+        message: 'Account created. Please verify your email.',
+      };
+    }
+
+    // No SMTP configured — auto-verify so production login works without inbox.
+    const verified = await this.users.markEmailVerified(user.id);
+    this.mail.logDevVerificationLink(user.email, token);
 
     return {
-      user: toPublicUser(user),
-      message: 'Account created. Please verify your email.',
+      user: toPublicUser(verified),
+      message: 'Account created. You can sign in now.',
     };
   }
 }
