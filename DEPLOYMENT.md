@@ -51,6 +51,16 @@ Swagger: `/docs` (disable or protect in production if desired)
 
 CI runs on `main` / `develop`: install → prisma generate → lint → unit tests → build.
 
+## Google OAuth
+
+1. Create a Web OAuth client in Google Cloud Console.
+2. Authorized redirect URI: `https://flowpilot.opsctrl.dev/v1/auth/google/callback`
+3. Set on OpsCtrl:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_CALLBACK_URL=https://flowpilot.opsctrl.dev/v1/auth/google/callback`
+4. Redeploy the API, then use **Continue with Google** on the Vercel login page.
+
 ## Security notes
 
 - Refresh tokens are hashed at rest and rotated on use

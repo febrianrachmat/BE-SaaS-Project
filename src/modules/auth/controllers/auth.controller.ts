@@ -7,6 +7,8 @@ import {
   Post,
   Req,
   Res,
+  ServiceUnavailableException,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -14,6 +16,8 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import * as express from 'express';
 import { Public } from '../../../common/decorators/public.decorator';
@@ -32,7 +36,9 @@ import { VerifyEmailUseCase } from '../use-cases/verify-email.use-case';
 import { ForgotPasswordUseCase } from '../use-cases/forgot-password.use-case';
 import { ResetPasswordUseCase } from '../use-cases/reset-password.use-case';
 import { GetMeUseCase } from '../use-cases/get-me.use-case';
+import { GoogleAuthUseCase } from '../use-cases/google-auth.use-case';
 import { TokenService } from '../services/token.service';
+import type { GoogleProfilePayload } from '../strategies/google.strategy';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -46,8 +52,58 @@ export class AuthController {
     private readonly forgotPasswordUseCase: ForgotPasswordUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
     private readonly getMeUseCase: GetMeUseCase,
+    private readonly googleAuthUseCase: GoogleAuthUseCase,
     private readonly tokens: TokenService,
+    private readonly config: ConfigService,
   ) {}
+
+  private assertGoogleConfigured(): void {
+    if (
+      !this.config.get<string>('GOOGLE_CLIENT_ID') ||
+      !this.config.get<string>('GOOGLE_CLIENT_SECRET')
+    ) {
+      throw new ServiceUnavailableException(
+        'Google sign-in is not configured on this server.',
+      );
+    }
+  }
+
+  @Public()
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Start Google OAuth' })
+  googleAuth(): void {
+    this.assertGoogleConfigured();
+  }
+
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Google OAuth callback' })
+  async googleCallback(
+    @Req() req: express.Request,
+    @Res() res: express.Response,
+  ): Promise<void> {
+    this.assertGoogleConfigured();
+    const profile = req.user as GoogleProfilePayload;
+    const result = await this.googleAuthUseCase.execute(profile, {
+      userAgent: req.headers['user-agent'],
+      ip: req.ip,
+    });
+
+    this.tokens.setAuthCookies(
+      res,
+      result.accessToken,
+      result.refreshToken,
+      result.rememberMe,
+    );
+
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+    res.redirect(`${frontendUrl}/app?oauth=1`);
+  }
 
   @Public()
   @Post('register')

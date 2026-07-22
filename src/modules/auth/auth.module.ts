@@ -18,7 +18,9 @@ import { VerifyEmailUseCase } from './use-cases/verify-email.use-case';
 import { ForgotPasswordUseCase } from './use-cases/forgot-password.use-case';
 import { ResetPasswordUseCase } from './use-cases/reset-password.use-case';
 import { GetMeUseCase } from './use-cases/get-me.use-case';
+import { GoogleAuthUseCase } from './use-cases/google-auth.use-case';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
@@ -40,7 +42,9 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
     GetMeUseCase,
+    GoogleAuthUseCase,
     JwtStrategy,
+    GoogleStrategy,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
