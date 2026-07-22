@@ -44,8 +44,16 @@ npm run build
 npm run start:prod
 ```
 
-Health: `GET /v1/health`  
+Health: `GET /v1/health` (liveness)  
+Ready: `GET /v1/health/ready` (database)  
 Swagger: `/docs` (disable or protect in production if desired)
+
+## Monitoring
+
+- Point an uptime monitor (UptimeRobot / Better Stack / OpsCtrl) at `GET /v1/health/ready` — expect HTTP 200.
+- App logs each HTTP request with method, path, status, and duration.
+- Local/CI smoke: `SMOKE_API_URL=https://flowpilot.opsctrl.dev/v1 SMOKE_WEB_URL=https://flowpilot-drab.vercel.app npm run smoke`
+- CI runs unit tests, e2e (Postgres service), build, then production smoke on `main`.
 
 ## GitHub Actions
 

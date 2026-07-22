@@ -51,7 +51,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
           typeof body.error === 'string'
             ? body.error.toUpperCase().replace(/\s+/g, '_')
             : HttpStatus[status] || code;
-        details = body.message;
+        details =
+          body.checks !== undefined
+            ? { checks: body.checks }
+            : body.message;
       }
 
       code = HttpStatus[status] ?? code;
