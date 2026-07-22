@@ -5,6 +5,7 @@ import { WorkspaceContext } from '../../../common/decorators/current-workspace.d
 import { ProjectService } from '../../project/services/project.service';
 import { CreateCommentDto, UpdateCommentDto } from '../dto/collab.dto';
 import { RealtimeService } from '../../realtime/realtime.service';
+import { NotificationService } from './notification.service';
 
 const MENTION_REGEX = /@([a-zA-Z0-9._-]+)/g;
 
@@ -14,14 +15,16 @@ export class CommentService {
     private readonly prisma: PrismaService,
     private readonly projects: ProjectService,
     private readonly realtime: RealtimeService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async list(
     ctx: WorkspaceContext,
     projectSlug: string,
     taskId: string,
+    userId: string,
   ) {
-    await this.requireTask(ctx, projectSlug, taskId);
+    await this.requireTask(ctx, projectSlug, taskId, userId);
     const comments = await this.prisma.comment.findMany({
       where: { taskId, deletedAt: null },
       include: {
@@ -48,7 +51,7 @@ export class CommentService {
     actorId: string,
     dto: CreateCommentDto,
   ) {
-    const task = await this.requireTask(ctx, projectSlug, taskId);
+    const task = await this.requireTask(ctx, projectSlug, taskId, actorId);
     const comment = await this.prisma.comment.create({
       data: {
         taskId,
@@ -75,23 +78,20 @@ export class CommentService {
 
     // Notify assignee (if not author)
     if (task.assigneeId && task.assigneeId !== actorId) {
-      await this.prisma.notification.create({
-        data: {
-          userId: task.assigneeId,
-          workspaceId: ctx.workspaceId,
-          type: NotificationType.COMMENT_ADDED,
-          title: 'New comment on your task',
-          body: `${comment.author.name} commented on "${task.title}"`,
-          data: {
-            taskId,
-            projectId: task.projectId,
-            commentId: comment.id,
-          },
-        },
-      });
-      this.realtime.emitNotificationNew({
+      await this.notifications.notify({
         userId: task.assigneeId,
+        workspaceId: ctx.workspaceId,
         workspaceSlug: ctx.slug,
+        type: NotificationType.COMMENT_ADDED,
+        title: 'New comment on your task',
+        body: `${comment.author.name} commented on "${task.title}"`,
+        data: {
+          taskId,
+          projectId: task.projectId,
+          projectSlug,
+          commentId: comment.id,
+        },
+        prefKey: 'commentAdded',
       });
     }
 
@@ -120,27 +120,22 @@ export class CommentService {
         })
         .filter((u) => u.id !== actorId);
 
-      if (mentionedUsers.length) {
-        await this.prisma.notification.createMany({
-          data: mentionedUsers.map((u) => ({
-            userId: u.id,
-            workspaceId: ctx.workspaceId,
-            type: NotificationType.MENTION,
-            title: 'You were mentioned',
-            body: `${comment.author.name} mentioned you on "${task.title}"`,
-            data: {
-              taskId,
-              projectId: task.projectId,
-              commentId: comment.id,
-            },
-          })),
+      for (const u of mentionedUsers) {
+        await this.notifications.notify({
+          userId: u.id,
+          workspaceId: ctx.workspaceId,
+          workspaceSlug: ctx.slug,
+          type: NotificationType.MENTION,
+          title: 'You were mentioned',
+          body: `${comment.author.name} mentioned you on "${task.title}"`,
+          data: {
+            taskId,
+            projectId: task.projectId,
+            projectSlug,
+            commentId: comment.id,
+          },
+          prefKey: 'mention',
         });
-        for (const u of mentionedUsers) {
-          this.realtime.emitNotificationNew({
-            userId: u.id,
-            workspaceSlug: ctx.slug,
-          });
-        }
       }
     }
 
@@ -168,7 +163,7 @@ export class CommentService {
     actorId: string,
     dto: UpdateCommentDto,
   ) {
-    await this.requireTask(ctx, projectSlug, taskId);
+    await this.requireTask(ctx, projectSlug, taskId, actorId);
     const existing = await this.prisma.comment.findFirst({
       where: { id: commentId, taskId, deletedAt: null },
     });
@@ -203,7 +198,7 @@ export class CommentService {
     commentId: string,
     actorId: string,
   ) {
-    await this.requireTask(ctx, projectSlug, taskId);
+    await this.requireTask(ctx, projectSlug, taskId, actorId);
     const existing = await this.prisma.comment.findFirst({
       where: { id: commentId, taskId, deletedAt: null },
     });
@@ -224,10 +219,12 @@ export class CommentService {
     ctx: WorkspaceContext,
     projectSlug: string,
     taskId: string,
+    userId: string,
   ) {
-    const project = await this.projects.requireProject(
-      ctx.workspaceId,
+    const project = await this.projects.requireAccessibleProject(
+      ctx,
       projectSlug,
+      userId,
     );
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, projectId: project.id, deletedAt: null },

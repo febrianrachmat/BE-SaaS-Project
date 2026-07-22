@@ -57,9 +57,73 @@ export type DashboardOverview = {
   }>;
 };
 
+export type MyWorkItem = {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: string;
+  dueDate: string | null;
+  project: { name: string; slug: string; icon: string | null };
+};
+
+export type MyWorkQuery = {
+  status?: TaskStatus;
+  priority?: string;
+  q?: string;
+  includeDone?: boolean;
+};
+
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getMyWork(
+    ctx: WorkspaceContext,
+    userId: string,
+    query: MyWorkQuery = {},
+  ): Promise<MyWorkItem[]> {
+    const includeDone = query.includeDone === true;
+    const rows = await this.prisma.task.findMany({
+      where: {
+        deletedAt: null,
+        assigneeId: userId,
+        parentId: null,
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.priority
+          ? { priority: query.priority as never }
+          : {}),
+        ...(query.q
+          ? {
+              OR: [
+                { title: { contains: query.q, mode: 'insensitive' } },
+                { description: { contains: query.q, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+        ...(!includeDone && !query.status
+          ? { status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELED] } }
+          : {}),
+        project: {
+          workspaceId: ctx.workspaceId,
+          deletedAt: null,
+        },
+      },
+      include: {
+        project: { select: { name: true, slug: true, icon: true } },
+      },
+      orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
+      take: 200,
+    });
+
+    return rows.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      dueDate: t.dueDate?.toISOString() ?? null,
+      project: t.project,
+    }));
+  }
 
   async getOverview(
     ctx: WorkspaceContext,

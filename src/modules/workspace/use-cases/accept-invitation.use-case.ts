@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { NotificationType } from '@prisma/client';
 import { hashToken } from '../../../common/utils/crypto.util';
 import { AcceptInvitationDto } from '../dto/member.dto';
 import { InvitationRepository } from '../repositories/invitation.repository';
@@ -10,6 +11,7 @@ import { WorkspaceMemberRepository } from '../repositories/workspace-member.repo
 import { UserRepository } from '../../auth/repositories/user.repository';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { toWorkspaceDto, WorkspaceDto } from '../mappers/workspace.mapper';
+import { NotificationService } from '../../collab/services/notification.service';
 
 @Injectable()
 export class AcceptInvitationUseCase {
@@ -18,6 +20,7 @@ export class AcceptInvitationUseCase {
     private readonly members: WorkspaceMemberRepository,
     private readonly users: UserRepository,
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async execute(
@@ -70,6 +73,23 @@ export class AcceptInvitationUseCase {
         metadata: { role: invitation.role },
       },
     });
+
+    if (invitation.invitedById && invitation.invitedById !== userId) {
+      await this.notifications.notify({
+        userId: invitation.invitedById,
+        workspaceId: invitation.workspaceId,
+        workspaceSlug: invitation.workspace.slug,
+        type: NotificationType.INVITATION,
+        title: 'Invitation accepted',
+        body: `${user.name} joined "${invitation.workspace.name}"`,
+        data: {
+          workspaceSlug: invitation.workspace.slug,
+          memberId: userId,
+          role: invitation.role,
+        },
+        prefKey: 'invitation',
+      });
+    }
 
     return {
       workspace: toWorkspaceDto(invitation.workspace, {

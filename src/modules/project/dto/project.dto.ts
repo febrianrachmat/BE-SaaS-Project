@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   MinLength,
@@ -77,6 +78,12 @@ export class UpdateProjectDto {
   @MaxLength(16)
   icon?: string | null;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  coverUrl?: string | null;
+
   @ApiPropertyOptional({ enum: ProjectVisibility })
   @IsOptional()
   @IsEnum(ProjectVisibility)
@@ -96,4 +103,10 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsDateString()
   deadline?: string | null;
+}
+
+export class AddProjectMemberDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  userId!: string;
 }

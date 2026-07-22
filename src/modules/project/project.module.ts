@@ -5,9 +5,10 @@ import { TaskRepository } from './repositories/task.repository';
 import { ProjectService } from './services/project.service';
 import { TaskService } from './services/task.service';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
-  imports: [RealtimeModule],
+  imports: [RealtimeModule, NotificationModule],
   controllers: [ProjectController],
   providers: [
     ProjectRepository,

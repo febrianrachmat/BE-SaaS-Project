@@ -62,11 +62,12 @@ export class CollabWorkspaceController {
   @Get('projects/:projectSlug/tasks/:taskId/comments')
   @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
   listComments(
+    @CurrentUser() user: AuthUser,
     @CurrentWorkspace() ctx: WorkspaceContext,
     @Param('projectSlug') projectSlug: string,
     @Param('taskId') taskId: string,
   ) {
-    return this.comments.list(ctx, projectSlug, taskId);
+    return this.comments.list(ctx, projectSlug, taskId, user.id);
   }
 
   @Post('projects/:projectSlug/tasks/:taskId/comments')
@@ -116,11 +117,12 @@ export class CollabWorkspaceController {
   @Get('projects/:projectSlug/tasks/:taskId/attachments')
   @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
   listAttachments(
+    @CurrentUser() user: AuthUser,
     @CurrentWorkspace() ctx: WorkspaceContext,
     @Param('projectSlug') projectSlug: string,
     @Param('taskId') taskId: string,
   ) {
-    return this.attachments.list(ctx, projectSlug, taskId);
+    return this.attachments.list(ctx, projectSlug, taskId, user.id);
   }
 
   @Post('projects/:projectSlug/tasks/:taskId/attachments')
@@ -151,6 +153,7 @@ export class CollabWorkspaceController {
   @Get('projects/:projectSlug/tasks/:taskId/attachments/:attachmentId/download')
   @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
   async downloadAttachment(
+    @CurrentUser() user: AuthUser,
     @CurrentWorkspace() ctx: WorkspaceContext,
     @Param('projectSlug') projectSlug: string,
     @Param('taskId') taskId: string,
@@ -162,6 +165,7 @@ export class CollabWorkspaceController {
       projectSlug,
       taskId,
       attachmentId,
+      user.id,
     );
 
     if (resolved.mode === 'redirect') {

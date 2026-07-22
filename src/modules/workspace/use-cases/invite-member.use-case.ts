@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WorkspaceRole } from '@prisma/client';
+import { NotificationType, WorkspaceRole } from '@prisma/client';
 import {
   generateSecureToken,
   hashToken,
@@ -21,6 +21,7 @@ import { MailService } from '../../auth/services/mail.service';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
 import { WORKSPACE_ROLE_RANK } from '../../../common/constants/rbac';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { NotificationService } from '../../collab/services/notification.service';
 
 @Injectable()
 export class InviteMemberUseCase {
@@ -32,6 +33,7 @@ export class InviteMemberUseCase {
     private readonly mail: MailService,
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async execute(
@@ -108,6 +110,23 @@ export class InviteMemberUseCase {
         metadata: { email, role },
       },
     });
+
+    if (existingUser) {
+      await this.notifications.notify({
+        userId: existingUser.id,
+        workspaceId: ctx.workspaceId,
+        workspaceSlug: ctx.slug,
+        type: NotificationType.INVITATION,
+        title: 'Workspace invitation',
+        body: `You were invited to join "${workspace.name}" as ${role}`,
+        data: {
+          invitationId: invitation.id,
+          workspaceSlug: workspace.slug,
+          role,
+        },
+        prefKey: 'invitation',
+      });
+    }
 
     const frontendUrl = this.config.get<string>(
       'FRONTEND_URL',

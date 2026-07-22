@@ -41,8 +41,9 @@ export class AttachmentService {
     ctx: WorkspaceContext,
     projectSlug: string,
     taskId: string,
+    userId: string,
   ) {
-    await this.requireTask(ctx, projectSlug, taskId);
+    await this.requireTask(ctx, projectSlug, taskId, userId);
     const rows = await this.prisma.attachment.findMany({
       where: { taskId, deletedAt: null },
       include: {
@@ -63,7 +64,7 @@ export class AttachmentService {
     actorId: string,
     file: Express.Multer.File,
   ) {
-    await this.requireTask(ctx, projectSlug, taskId);
+    await this.requireTask(ctx, projectSlug, taskId, actorId);
 
     if (!file) throw new BadRequestException('File is required');
     if (!ALLOWED_MIME.has(file.mimetype)) {
@@ -113,7 +114,7 @@ export class AttachmentService {
     attachmentId: string,
     actorId: string,
   ) {
-    await this.requireTask(ctx, projectSlug, taskId);
+    await this.requireTask(ctx, projectSlug, taskId, actorId);
     const existing = await this.prisma.attachment.findFirst({
       where: { id: attachmentId, taskId, deletedAt: null },
     });
@@ -144,6 +145,7 @@ export class AttachmentService {
     projectSlug: string,
     taskId: string,
     attachmentId: string,
+    userId: string,
   ): Promise<
     | { mode: 'redirect'; url: string; fileName: string; mimeType: string }
     | {
@@ -153,7 +155,7 @@ export class AttachmentService {
         mimeType: string;
       }
   > {
-    await this.requireTask(ctx, projectSlug, taskId);
+    await this.requireTask(ctx, projectSlug, taskId, userId);
     const attachment = await this.prisma.attachment.findFirst({
       where: { id: attachmentId, taskId, deletedAt: null },
     });
@@ -221,10 +223,12 @@ export class AttachmentService {
     ctx: WorkspaceContext,
     projectSlug: string,
     taskId: string,
+    userId: string,
   ) {
-    const project = await this.projects.requireProject(
-      ctx.workspaceId,
+    const project = await this.projects.requireAccessibleProject(
+      ctx,
       projectSlug,
+      userId,
     );
     const task = await this.prisma.task.findFirst({
       where: { id: taskId, projectId: project.id, deletedAt: null },

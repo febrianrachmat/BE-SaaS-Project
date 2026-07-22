@@ -22,6 +22,7 @@ import { GetMeUseCase } from './use-cases/get-me.use-case';
 import { UpdateProfileUseCase } from './use-cases/update-profile.use-case';
 import { ChangePasswordUseCase } from './use-cases/change-password.use-case';
 import { GoogleAuthUseCase } from './use-cases/google-auth.use-case';
+import { UploadAvatarUseCase } from './use-cases/upload-avatar.use-case';
 import { NotificationPrefsService } from './services/notification-prefs.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -51,6 +52,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     UpdateProfileUseCase,
     ChangePasswordUseCase,
     GoogleAuthUseCase,
+    UploadAvatarUseCase,
     JwtStrategy,
     GoogleStrategy,
     {
@@ -58,6 +60,6 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       useClass: JwtAuthGuard,
     },
   ],
-  exports: [TokenService, UserRepository, MailService],
+  exports: [TokenService, UserRepository, MailService, NotificationPrefsService],
 })
 export class AuthModule {}

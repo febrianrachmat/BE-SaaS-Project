@@ -109,6 +109,45 @@ export class MailService {
     );
   }
 
+  async sendNotificationEmail(input: {
+    to: string;
+    subject: string;
+    title: string;
+    body?: string;
+    actionUrl?: string;
+    actionLabel?: string;
+  }): Promise<void> {
+    const safeTitle = this.escapeHtml(input.title);
+    const safeBody = input.body ? this.escapeHtml(input.body) : '';
+    const actionUrl = input.actionUrl;
+    const actionLabel = this.escapeHtml(input.actionLabel ?? 'Open in FlowPilot');
+
+    const textParts = [
+      input.title,
+      input.body ?? '',
+      actionUrl ? `${input.actionLabel ?? 'Open'}: ${actionUrl}` : '',
+      '',
+      'You can manage email preferences in Account settings.',
+    ].filter(Boolean);
+
+    await this.send(
+      input.to,
+      input.subject,
+      textParts.join('\n'),
+      this.htmlLayout(
+        safeTitle,
+        `${safeBody ? `<p style="margin:0 0 16px">${safeBody}</p>` : ''}
+         ${
+           actionUrl
+             ? `<p style="margin:0 0 24px"><a href="${actionUrl}" style="display:inline-block;background:#0f766e;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${actionLabel}</a></p>
+                <p style="margin:0;color:#64748b;font-size:13px">Or paste this link:<br/><span style="word-break:break-all">${actionUrl}</span></p>`
+             : ''
+         }
+         <p style="margin:16px 0 0;color:#64748b;font-size:13px">Manage notification preferences in Account settings.</p>`,
+      ),
+    );
+  }
+
   private frontendUrl(): string {
     return this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }

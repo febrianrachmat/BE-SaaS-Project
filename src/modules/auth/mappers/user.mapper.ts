@@ -10,6 +10,7 @@ export type PublicUser = {
   locale: string;
   theme: string;
   hasPassword: boolean;
+  systemRole: string;
   emailVerifiedAt: string | null;
   createdAt: string;
 };
@@ -25,6 +26,7 @@ export function toPublicUser(user: User): PublicUser {
     locale: user.locale,
     theme: user.theme,
     hasPassword: Boolean(user.passwordHash),
+    systemRole: user.systemRole,
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
   };

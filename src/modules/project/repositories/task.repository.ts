@@ -9,6 +9,9 @@ const taskInclude = {
   assignee: {
     select: { id: true, name: true, email: true, avatarUrl: true },
   },
+  cycle: {
+    select: { id: true, name: true, status: true },
+  },
   labels: { include: { label: true } },
   checklist: {
     where: { deletedAt: null },
@@ -58,6 +61,18 @@ export class TaskRepository {
       },
       include: taskInclude,
       orderBy: [{ position: 'asc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  listSubtasks(projectId: string, parentId: string) {
+    return this.prisma.task.findMany({
+      where: {
+        projectId,
+        parentId,
+        deletedAt: null,
+      },
+      include: taskInclude,
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
     });
   }
 

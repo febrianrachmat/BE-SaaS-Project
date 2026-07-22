@@ -14,7 +14,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { TaskPriority, TaskStatus } from '@prisma/client';
+import { TaskDependencyType, TaskPriority, TaskStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 export class CreateTaskDto {
@@ -106,6 +106,14 @@ export class UpdateTaskDto {
   @IsUUID()
   assigneeId?: string | null;
 
+  @ApiPropertyOptional({
+    description: 'Assign task to a workspace cycle, or null to unlink',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsUUID()
+  cycleId?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()
@@ -168,6 +176,18 @@ export class CalendarQueryDto {
   to!: string;
 }
 
+export class RoadmapQueryDto extends CalendarQueryDto {}
+
+export class CreateTaskDependencyDto {
+  @ApiProperty({ description: 'Related task id' })
+  @IsUUID()
+  toTaskId!: string;
+
+  @ApiProperty({ enum: TaskDependencyType })
+  @IsEnum(TaskDependencyType)
+  type!: TaskDependencyType;
+}
+
 export class TaskQueryDto {
   @ApiPropertyOptional({ enum: TaskStatus })
   @IsOptional()
@@ -218,6 +238,21 @@ export class CreateLabelDto {
   @MinLength(1)
   @MaxLength(40)
   name!: string;
+
+  @ApiPropertyOptional({ example: '#EF4444' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  color?: string;
+}
+
+export class UpdateLabelDto {
+  @ApiPropertyOptional({ example: 'Bug' })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  name?: string;
 
   @ApiPropertyOptional({ example: '#EF4444' })
   @IsOptional()

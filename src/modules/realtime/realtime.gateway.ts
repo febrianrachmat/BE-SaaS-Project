@@ -2,6 +2,7 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
@@ -11,6 +12,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+import { PrismaService } from '../../infrastructure/prisma/prisma.service';
 import { RealtimeService } from './realtime.service';
 import type { AccessTokenPayload } from '../auth/services/token.service';
 
@@ -31,7 +33,9 @@ function parseCookies(header?: string): Record<string, string> {
     credentials: true,
   },
 })
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
+export class RealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(RealtimeGateway.name);
 
   @WebSocketServer()
@@ -41,6 +45,7 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     private readonly realtime: RealtimeService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   afterInit(server: Server): void {
@@ -77,10 +82,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     }
   }
 
+  handleDisconnect(client: Socket): void {
+    const entry = this.realtime.removePresence(client.id);
+    if (entry) {
+      this.realtime.emitPresenceUpdate(entry.workspaceSlug);
+    }
+  }
+
   @SubscribeMessage('workspace:join')
   handleJoinWorkspace(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { slug?: string },
+    @MessageBody() body: { slug?: string; projectSlug?: string },
   ): { ok: boolean } {
     const slug = body?.slug?.trim();
     if (!slug || !client.data.userId) {
@@ -99,5 +111,64 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     if (!slug) return { ok: false };
     void client.leave(`workspace:${slug}`);
     return { ok: true };
+  }
+
+  @SubscribeMessage('presence:join')
+  async handlePresenceJoin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    body: { workspaceSlug?: string; projectSlug?: string },
+  ): Promise<{ ok: boolean }> {
+    const workspaceSlug = body?.workspaceSlug?.trim();
+    const userId = client.data.userId as string | undefined;
+    if (!workspaceSlug || !userId) {
+      return { ok: false };
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+      select: { id: true, name: true, avatarUrl: true },
+    });
+    if (!user) {
+      return { ok: false };
+    }
+
+    const previous = this.realtime.getPresence(client.id);
+    if (previous && previous.workspaceSlug !== workspaceSlug) {
+      this.realtime.removePresence(client.id);
+      this.realtime.emitPresenceUpdate(previous.workspaceSlug);
+    }
+
+    const projectSlug = body?.projectSlug?.trim() || undefined;
+
+    await client.join(`workspace:${workspaceSlug}`);
+    this.realtime.setPresence(client.id, {
+      userId,
+      name: user.name,
+      avatarUrl: user.avatarUrl,
+      workspaceSlug,
+      projectSlug,
+    });
+    this.realtime.emitPresenceUpdate(workspaceSlug);
+    return { ok: true };
+  }
+
+  @SubscribeMessage('presence:leave')
+  handlePresenceLeave(
+    @ConnectedSocket() client: Socket,
+  ): { ok: boolean } {
+    const entry = this.realtime.removePresence(client.id);
+    if (entry) {
+      this.realtime.emitPresenceUpdate(entry.workspaceSlug);
+    }
+    return { ok: true };
+  }
+
+  /** Optional keepalive — presence is primarily driven by join/leave/disconnect. */
+  @SubscribeMessage('presence:heartbeat')
+  handlePresenceHeartbeat(
+    @ConnectedSocket() client: Socket,
+  ): { ok: boolean } {
+    return { ok: Boolean(this.realtime.getPresence(client.id)) };
   }
 }

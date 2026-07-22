@@ -4,19 +4,21 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { WorkspaceRole } from '@prisma/client';
+import { NotificationType, WorkspaceRole } from '@prisma/client';
 import { UpdateMemberRoleDto } from '../dto/member.dto';
 import { WorkspaceMemberRepository } from '../repositories/workspace-member.repository';
 import { toMemberDto, MemberDto } from '../mappers/workspace.mapper';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
 import { WORKSPACE_ROLE_RANK } from '../../../common/constants/rbac';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { NotificationService } from '../../collab/services/notification.service';
 
 @Injectable()
 export class UpdateMemberRoleUseCase {
   constructor(
     private readonly members: WorkspaceMemberRepository,
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationService,
   ) {}
 
   async execute(
@@ -74,6 +76,20 @@ export class UpdateMemberRoleUseCase {
           from: member.role,
           to: dto.role,
         },
+      },
+    });
+
+    await this.notifications.notify({
+      userId: member.userId,
+      workspaceId: ctx.workspaceId,
+      workspaceSlug: ctx.slug,
+      type: NotificationType.ROLE_CHANGED,
+      title: 'Role updated',
+      body: `Your role was changed to ${dto.role}`,
+      data: {
+        memberId,
+        from: member.role,
+        to: dto.role,
       },
     });
 

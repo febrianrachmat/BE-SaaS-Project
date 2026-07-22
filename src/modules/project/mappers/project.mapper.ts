@@ -4,6 +4,7 @@ import {
   ProjectStatus,
   ProjectVisibility,
   Task,
+  TaskDependencyType,
   TaskPriority,
   TaskStatus,
 } from '@prisma/client';
@@ -40,6 +41,12 @@ export type LabelDto = {
   color: string;
 };
 
+export type TaskCycleDto = {
+  id: string;
+  name: string;
+  status: string;
+};
+
 export type ChecklistItemDto = {
   id: string;
   title: string;
@@ -65,9 +72,38 @@ export type TaskDto = {
   updatedAt: string;
   reporter?: TaskUserDto;
   assignee?: TaskUserDto | null;
+  cycle?: TaskCycleDto | null;
   labels?: LabelDto[];
   checklist?: ChecklistItemDto[];
   subtaskCount?: number;
+};
+
+export type TaskSummaryDto = {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueDate: string | null;
+};
+
+export type TaskDependencyDto = {
+  id: string;
+  fromTaskId: string;
+  toTaskId: string;
+  type: TaskDependencyType;
+  createdAt: string;
+  relatedTask: TaskSummaryDto;
+};
+
+export type TaskDependenciesDto = {
+  blocking: TaskDependencyDto[];
+  blockedBy: TaskDependencyDto[];
+  relatesTo: TaskDependencyDto[];
+};
+
+export type RoadmapTaskDto = TaskDto & {
+  startDate: string;
+  project: { id: string; name: string; slug: string; icon: string | null };
 };
 
 type UserPick = {
@@ -105,6 +141,7 @@ export function toTaskDto(
   task: Task & {
     reporter?: UserPick;
     assignee?: UserPick | null;
+    cycle?: TaskCycleDto | null;
     labels?: { label: LabelDto }[];
     checklist?: { id: string; title: string; isDone: boolean; position: number; deletedAt: Date | null }[];
     _count?: { subtasks: number };
@@ -128,6 +165,7 @@ export function toTaskDto(
     updatedAt: task.updatedAt.toISOString(),
     reporter: task.reporter,
     assignee: task.assignee ?? null,
+    cycle: task.cycle ?? null,
     labels: task.labels?.map((l) => l.label),
     checklist: task.checklist
       ?.filter((c) => !c.deletedAt)

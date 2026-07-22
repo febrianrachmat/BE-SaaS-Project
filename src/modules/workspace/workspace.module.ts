@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationModule } from '../notification/notification.module';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { WorkspaceController } from './controllers/workspace.controller';
 import { WorkspaceRepository } from './repositories/workspace.repository';
@@ -28,7 +29,7 @@ import { RemoveMemberUseCase } from './use-cases/remove-member.use-case';
 import { TransferOwnershipUseCase } from './use-cases/transfer-ownership.use-case';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationModule],
   controllers: [WorkspaceController],
   providers: [
     WorkspaceRepository,

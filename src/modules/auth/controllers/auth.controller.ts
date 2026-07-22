@@ -4,22 +4,29 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
   Req,
   Res,
   ServiceUnavailableException,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCookieAuth,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
+import { memoryStorage } from 'multer';
 import * as express from 'express';
 import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -45,6 +52,7 @@ import { GetMeUseCase } from '../use-cases/get-me.use-case';
 import { UpdateProfileUseCase } from '../use-cases/update-profile.use-case';
 import { ChangePasswordUseCase } from '../use-cases/change-password.use-case';
 import { GoogleAuthUseCase } from '../use-cases/google-auth.use-case';
+import { UploadAvatarUseCase } from '../use-cases/upload-avatar.use-case';
 import { NotificationPrefsService } from '../services/notification-prefs.service';
 import { TokenService } from '../services/token.service';
 import type { GoogleProfilePayload } from '../strategies/google.strategy';
@@ -66,6 +74,7 @@ export class AuthController {
     private readonly changePasswordUseCase: ChangePasswordUseCase,
     private readonly notificationPrefs: NotificationPrefsService,
     private readonly googleAuthUseCase: GoogleAuthUseCase,
+    private readonly uploadAvatarUseCase: UploadAvatarUseCase,
     private readonly tokens: TokenService,
     private readonly config: ConfigService,
   ) {}
@@ -238,6 +247,40 @@ export class AuthController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.updateProfileUseCase.execute(user.id, dto);
+  }
+
+  @Post('me/avatar')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload profile avatar image' })
+  uploadAvatar(
+    @CurrentUser() user: AuthUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.uploadAvatarUseCase.execute(user.id, file);
+  }
+
+  @Public()
+  @Get('avatars/:userId')
+  @ApiOperation({ summary: 'Serve a user avatar image' })
+  async getAvatar(
+    @Param('userId') userId: string,
+    @Res() res: express.Response,
+  ) {
+    return this.uploadAvatarUseCase.streamAvatar(userId, res);
   }
 
   @Post('change-password')
