@@ -28,11 +28,13 @@ import { LoginDto } from '../dto/login.dto';
 import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { VerifyEmailDto } from '../dto/verify-email.dto';
+import { ResendVerificationDto } from '../dto/resend-verification.dto';
 import { RegisterUseCase } from '../use-cases/register.use-case';
 import { LoginUseCase } from '../use-cases/login.use-case';
 import { RefreshUseCase } from '../use-cases/refresh.use-case';
 import { LogoutUseCase } from '../use-cases/logout.use-case';
 import { VerifyEmailUseCase } from '../use-cases/verify-email.use-case';
+import { ResendVerificationUseCase } from '../use-cases/resend-verification.use-case';
 import { ForgotPasswordUseCase } from '../use-cases/forgot-password.use-case';
 import { ResetPasswordUseCase } from '../use-cases/reset-password.use-case';
 import { GetMeUseCase } from '../use-cases/get-me.use-case';
@@ -49,6 +51,7 @@ export class AuthController {
     private readonly refreshUseCase: RefreshUseCase,
     private readonly logoutUseCase: LogoutUseCase,
     private readonly verifyEmailUseCase: VerifyEmailUseCase,
+    private readonly resendVerificationUseCase: ResendVerificationUseCase,
     private readonly forgotPasswordUseCase: ForgotPasswordUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
     private readonly getMeUseCase: GetMeUseCase,
@@ -179,6 +182,15 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify email with token' })
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.verifyEmailUseCase.execute(dto);
+  }
+
+  @Public()
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Resend email verification link' })
+  async resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.resendVerificationUseCase.execute(dto);
   }
 
   @Public()

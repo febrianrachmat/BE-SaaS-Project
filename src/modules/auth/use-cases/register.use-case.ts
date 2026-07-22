@@ -1,5 +1,4 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   generateSecureToken,
   hashToken,
@@ -19,7 +18,6 @@ export class RegisterUseCase {
     private readonly emailVerifications: EmailVerificationRepository,
     private readonly passwords: PasswordService,
     private readonly mail: MailService,
-    private readonly config: ConfigService,
   ) {}
 
   async execute(
@@ -47,8 +45,7 @@ export class RegisterUseCase {
       addDuration(new Date(), '24h'),
     );
 
-    const smtpConfigured = Boolean(this.config.get<string>('SMTP_HOST'));
-    if (smtpConfigured) {
+    if (this.mail.isConfigured()) {
       await this.mail.sendVerificationEmail(user.email, token);
       return {
         user: toPublicUser(user),

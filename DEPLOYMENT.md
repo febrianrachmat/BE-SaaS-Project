@@ -51,6 +51,27 @@ Swagger: `/docs` (disable or protect in production if desired)
 
 CI runs on `main` / `develop`: install → prisma generate → lint → unit tests → build.
 
+## Production SMTP
+
+Without `SMTP_HOST`, FlowPilot logs emails and auto-verifies new accounts so login still works.
+
+With SMTP configured on OpsCtrl (add one-by-one, then Redeploy):
+
+| Variable | Example (Resend) |
+|----------|------------------|
+| `SMTP_HOST` | `smtp.resend.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_SECURE` | `true` |
+| `SMTP_USER` | `resend` |
+| `SMTP_PASS` | API key |
+| `MAIL_FROM` | `FlowPilot <noreply@yourdomain.com>` |
+
+For STARTTLS on port 587 set `SMTP_SECURE=false` and `SMTP_REQUIRE_TLS=true`.
+
+`GET /v1/health` includes `mailConfigured: true|false`.
+
+After SMTP is live, new signups must verify email; use `POST /v1/auth/resend-verification` if needed.
+
 ## Google OAuth
 
 1. Create a Web OAuth client in Google Cloud Console.
