@@ -19,7 +19,10 @@ import { ResendVerificationUseCase } from './use-cases/resend-verification.use-c
 import { ForgotPasswordUseCase } from './use-cases/forgot-password.use-case';
 import { ResetPasswordUseCase } from './use-cases/reset-password.use-case';
 import { GetMeUseCase } from './use-cases/get-me.use-case';
+import { UpdateProfileUseCase } from './use-cases/update-profile.use-case';
+import { ChangePasswordUseCase } from './use-cases/change-password.use-case';
 import { GoogleAuthUseCase } from './use-cases/google-auth.use-case';
+import { NotificationPrefsService } from './services/notification-prefs.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -31,6 +34,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     PasswordService,
     MailService,
     TokenService,
+    NotificationPrefsService,
     UserRepository,
     RefreshTokenRepository,
     EmailVerificationRepository,
@@ -44,6 +48,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
     GetMeUseCase,
+    UpdateProfileUseCase,
+    ChangePasswordUseCase,
     GoogleAuthUseCase,
     JwtStrategy,
     GoogleStrategy,

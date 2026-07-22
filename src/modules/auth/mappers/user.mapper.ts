@@ -5,9 +5,11 @@ export type PublicUser = {
   email: string;
   name: string;
   avatarUrl: string | null;
+  bio: string | null;
   timezone: string;
   locale: string;
   theme: string;
+  hasPassword: boolean;
   emailVerifiedAt: string | null;
   createdAt: string;
 };
@@ -18,9 +20,11 @@ export function toPublicUser(user: User): PublicUser {
     email: user.email,
     name: user.name,
     avatarUrl: user.avatarUrl,
+    bio: user.bio,
     timezone: user.timezone,
     locale: user.locale,
     theme: user.theme,
+    hasPassword: Boolean(user.passwordHash),
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
   };

@@ -55,4 +55,14 @@ export class UserRepository {
       data: { passwordHash },
     });
   }
+
+  updateProfile(
+    userId: string,
+    data: Prisma.UserUpdateInput,
+  ): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data,
+    });
+  }
 }

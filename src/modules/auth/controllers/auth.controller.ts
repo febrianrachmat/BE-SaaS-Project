@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -29,6 +30,9 @@ import { ForgotPasswordDto } from '../dto/forgot-password.dto';
 import { ResetPasswordDto } from '../dto/reset-password.dto';
 import { VerifyEmailDto } from '../dto/verify-email.dto';
 import { ResendVerificationDto } from '../dto/resend-verification.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
+import { UpdateNotificationPrefsDto } from '../dto/update-notification-prefs.dto';
 import { RegisterUseCase } from '../use-cases/register.use-case';
 import { LoginUseCase } from '../use-cases/login.use-case';
 import { RefreshUseCase } from '../use-cases/refresh.use-case';
@@ -38,7 +42,10 @@ import { ResendVerificationUseCase } from '../use-cases/resend-verification.use-
 import { ForgotPasswordUseCase } from '../use-cases/forgot-password.use-case';
 import { ResetPasswordUseCase } from '../use-cases/reset-password.use-case';
 import { GetMeUseCase } from '../use-cases/get-me.use-case';
+import { UpdateProfileUseCase } from '../use-cases/update-profile.use-case';
+import { ChangePasswordUseCase } from '../use-cases/change-password.use-case';
 import { GoogleAuthUseCase } from '../use-cases/google-auth.use-case';
+import { NotificationPrefsService } from '../services/notification-prefs.service';
 import { TokenService } from '../services/token.service';
 import type { GoogleProfilePayload } from '../strategies/google.strategy';
 
@@ -55,6 +62,9 @@ export class AuthController {
     private readonly forgotPasswordUseCase: ForgotPasswordUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
     private readonly getMeUseCase: GetMeUseCase,
+    private readonly updateProfileUseCase: UpdateProfileUseCase,
+    private readonly changePasswordUseCase: ChangePasswordUseCase,
+    private readonly notificationPrefs: NotificationPrefsService,
     private readonly googleAuthUseCase: GoogleAuthUseCase,
     private readonly tokens: TokenService,
     private readonly config: ConfigService,
@@ -217,5 +227,48 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user' })
   async me(@CurrentUser() user: AuthUser) {
     return this.getMeUseCase.execute(user.id);
+  }
+
+  @Patch('me')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Update current user profile' })
+  async updateMe(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.updateProfileUseCase.execute(user.id, dto);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Change password for password-based accounts' })
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.changePasswordUseCase.execute(user.id, dto);
+  }
+
+  @Get('me/notification-preferences')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Get notification preferences' })
+  async getNotificationPrefs(@CurrentUser() user: AuthUser) {
+    return this.notificationPrefs.getOrCreate(user.id);
+  }
+
+  @Patch('me/notification-preferences')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Update notification preferences' })
+  async updateNotificationPrefs(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateNotificationPrefsDto,
+  ) {
+    return this.notificationPrefs.update(user.id, dto);
   }
 }
