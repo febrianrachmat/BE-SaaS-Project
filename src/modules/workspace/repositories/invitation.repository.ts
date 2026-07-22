@@ -46,7 +46,25 @@ export class InvitationRepository {
         status: InvitationStatus.PENDING,
         expiresAt: { gt: new Date() },
       },
+      include: {
+        invitedBy: {
+          select: { id: true, name: true, email: true },
+        },
+      },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  findByIdInWorkspace(workspaceId: string, id: string) {
+    return this.prisma.invitation.findFirst({
+      where: { id, workspaceId },
+    });
+  }
+
+  refreshToken(id: string, tokenHash: string, expiresAt: Date) {
+    return this.prisma.invitation.update({
+      where: { id },
+      data: { tokenHash, expiresAt, status: InvitationStatus.PENDING },
     });
   }
 

@@ -8,8 +8,10 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Public } from '../../../common/decorators/public.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { AuthUser } from '../../../common/decorators/current-user.decorator';
 import { CurrentWorkspace } from '../../../common/decorators/current-workspace.decorator';
@@ -36,6 +38,14 @@ import { AcceptInvitationUseCase } from '../use-cases/accept-invitation.use-case
 import { UpdateMemberRoleUseCase } from '../use-cases/update-member-role.use-case';
 import { RemoveMemberUseCase } from '../use-cases/remove-member.use-case';
 import { TransferOwnershipUseCase } from '../use-cases/transfer-ownership.use-case';
+import {
+  ListInvitationsUseCase,
+  RevokeInvitationUseCase,
+} from '../use-cases/manage-invitations.use-case';
+import {
+  PreviewInvitationUseCase,
+  ResendInvitationUseCase,
+} from '../use-cases/resend-preview-invitation.use-case';
 
 @ApiTags('workspaces')
 @ApiBearerAuth()
@@ -52,6 +62,10 @@ export class WorkspaceController {
     private readonly listMembers: ListMembersUseCase,
     private readonly inviteMember: InviteMemberUseCase,
     private readonly acceptInvitation: AcceptInvitationUseCase,
+    private readonly listInvitations: ListInvitationsUseCase,
+    private readonly revokeInvitation: RevokeInvitationUseCase,
+    private readonly resendInvitation: ResendInvitationUseCase,
+    private readonly previewInvitation: PreviewInvitationUseCase,
     private readonly updateMemberRole: UpdateMemberRoleUseCase,
     private readonly removeMemberUseCase: RemoveMemberUseCase,
     private readonly transferOwnership: TransferOwnershipUseCase,
@@ -67,6 +81,13 @@ export class WorkspaceController {
   @ApiOperation({ summary: 'List my workspaces' })
   list(@CurrentUser() user: AuthUser) {
     return this.listWorkspaces.execute(user.id);
+  }
+
+  @Public()
+  @Get('invitations/preview')
+  @ApiOperation({ summary: 'Preview invitation details by token' })
+  preview(@Query('token') token: string) {
+    return this.previewInvitation.execute(token);
   }
 
   @Post('invitations/accept')
@@ -133,6 +154,13 @@ export class WorkspaceController {
     return this.listMembers.execute(ctx);
   }
 
+  @Get('workspaces/:slug/invitations')
+  @RequirePermissions(PERMISSIONS.MEMBER_INVITE)
+  @ApiOperation({ summary: 'List pending invitations' })
+  invitations(@CurrentWorkspace() ctx: WorkspaceContext) {
+    return this.listInvitations.execute(ctx);
+  }
+
   @Post('workspaces/:slug/invitations')
   @RequirePermissions(PERMISSIONS.MEMBER_INVITE)
   @ApiOperation({ summary: 'Invite member by email' })
@@ -142,6 +170,28 @@ export class WorkspaceController {
     @Body() dto: InviteMemberDto,
   ) {
     return this.inviteMember.execute(ctx, user.id, dto);
+  }
+
+  @Post('workspaces/:slug/invitations/:invitationId/resend')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.MEMBER_INVITE)
+  @ApiOperation({ summary: 'Resend invitation email and refresh link' })
+  resend(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.resendInvitation.execute(ctx, user.id, invitationId);
+  }
+
+  @Delete('workspaces/:slug/invitations/:invitationId')
+  @RequirePermissions(PERMISSIONS.MEMBER_INVITE)
+  @ApiOperation({ summary: 'Revoke a pending invitation' })
+  revoke(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.revokeInvitation.execute(ctx, invitationId);
   }
 
   @Patch('workspaces/:slug/members/:memberId')

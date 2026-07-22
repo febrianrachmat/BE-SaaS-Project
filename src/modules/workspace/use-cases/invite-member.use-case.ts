@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { WorkspaceRole } from '@prisma/client';
 import {
   generateSecureToken,
@@ -30,13 +31,21 @@ export class InviteMemberUseCase {
     private readonly users: UserRepository,
     private readonly mail: MailService,
     private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
   ) {}
 
   async execute(
     ctx: WorkspaceContext,
     actorId: string,
     dto: InviteMemberDto,
-  ): Promise<{ message: string; email: string }> {
+  ): Promise<{
+    message: string;
+    email: string;
+    inviteLink: string;
+    invitationId: string;
+    role: WorkspaceRole;
+    expiresAt: string;
+  }> {
     const role = dto.role ?? WorkspaceRole.MEMBER;
     if (role === WorkspaceRole.OWNER) {
       throw new BadRequestException('Cannot invite someone as OWNER');
@@ -74,16 +83,22 @@ export class InviteMemberUseCase {
     }
 
     const token = generateSecureToken();
-    await this.invitations.create({
+    const expiresAt = addDuration(new Date(), '7d');
+    const invitation = await this.invitations.create({
       workspaceId: ctx.workspaceId,
       email,
       role,
       tokenHash: hashToken(token),
       invitedById: actorId,
-      expiresAt: addDuration(new Date(), '7d'),
+      expiresAt,
     });
 
-    await this.mail.sendWorkspaceInviteEmail(email, workspace.name, token);
+    let mailDelivered = true;
+    try {
+      await this.mail.sendWorkspaceInviteEmail(email, workspace.name, token);
+    } catch {
+      mailDelivered = false;
+    }
 
     await this.prisma.activityLog.create({
       data: {
@@ -94,6 +109,20 @@ export class InviteMemberUseCase {
       },
     });
 
-    return { message: 'Invitation sent', email };
+    const frontendUrl = this.config.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+
+    return {
+      message: mailDelivered
+        ? 'Invitation sent'
+        : 'Invitation created. Email delivery failed — share the invite link instead.',
+      email,
+      inviteLink: `${frontendUrl}/invitations/accept?token=${token}`,
+      invitationId: invitation.id,
+      role,
+      expiresAt: expiresAt.toISOString(),
+    };
   }
 }

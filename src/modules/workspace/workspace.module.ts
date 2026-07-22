@@ -15,6 +15,14 @@ import { DeleteWorkspaceUseCase } from './use-cases/delete-workspace.use-case';
 import { ListMembersUseCase } from './use-cases/list-members.use-case';
 import { InviteMemberUseCase } from './use-cases/invite-member.use-case';
 import { AcceptInvitationUseCase } from './use-cases/accept-invitation.use-case';
+import {
+  ListInvitationsUseCase,
+  RevokeInvitationUseCase,
+} from './use-cases/manage-invitations.use-case';
+import {
+  PreviewInvitationUseCase,
+  ResendInvitationUseCase,
+} from './use-cases/resend-preview-invitation.use-case';
 import { UpdateMemberRoleUseCase } from './use-cases/update-member-role.use-case';
 import { RemoveMemberUseCase } from './use-cases/remove-member.use-case';
 import { TransferOwnershipUseCase } from './use-cases/transfer-ownership.use-case';
@@ -35,6 +43,10 @@ import { TransferOwnershipUseCase } from './use-cases/transfer-ownership.use-cas
     ListMembersUseCase,
     InviteMemberUseCase,
     AcceptInvitationUseCase,
+    ListInvitationsUseCase,
+    RevokeInvitationUseCase,
+    ResendInvitationUseCase,
+    PreviewInvitationUseCase,
     UpdateMemberRoleUseCase,
     RemoveMemberUseCase,
     TransferOwnershipUseCase,

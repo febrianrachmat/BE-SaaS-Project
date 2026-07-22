@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -49,7 +48,12 @@ export class AcceptInvitationUseCase {
     );
     if (existing) {
       await this.invitations.markAccepted(invitation.id);
-      throw new ConflictException('You are already a member of this workspace');
+      return {
+        workspace: toWorkspaceDto(invitation.workspace, {
+          role: existing.role,
+        }),
+        message: 'You are already a member of this workspace',
+      };
     }
 
     await this.members.create(
