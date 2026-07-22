@@ -24,15 +24,17 @@
 5. Configure real SMTP (`SMTP_*`)
 6. Run migrations: `npx prisma migrate deploy`
 
-## Docker
+## OpsCtrl
 
-```bash
-docker compose up -d postgres mailpit
-docker build -t flowpilot-api .
-docker run --env-file .env -p 4000:4000 flowpilot-api
-```
+OpsCtrl auto-generates its own build image for NestJS + Prisma.
+Do **not** commit a custom `Dockerfile` unless you intentionally override their builder.
 
-## OpsCtrl / VPS
+Reserved platform vars (do not set manually): `APP_URL`, `PORT`, `DATABASE_URL`, `NODE_ENV`.
+OpsCtrl injects its managed Postgres as `DATABASE_URL`.
+
+Set app vars in the dashboard instead: `FRONTEND_URL`, JWT secrets, cookie flags, storage.
+
+## VPS (manual)
 
 ```bash
 npm ci
