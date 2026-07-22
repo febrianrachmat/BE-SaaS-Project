@@ -7,7 +7,7 @@
 | API | OpsCtrl / any Node host | NestJS on port 4000 |
 | Database | Managed PostgreSQL | Prisma migrations |
 | Mail | SMTP provider | Mailpit locally |
-| Files | Local disk or S3 later | `STORAGE_LOCAL_PATH` |
+| Files | Local disk or S3/R2 | `STORAGE_DRIVER` |
 
 ## Prerequisites
 
@@ -71,6 +71,25 @@ For STARTTLS on port 587 set `SMTP_SECURE=false` and `SMTP_REQUIRE_TLS=true`.
 `GET /v1/health` includes `mailConfigured: true|false`.
 
 After SMTP is live, new signups must verify email; use `POST /v1/auth/resend-verification` if needed.
+
+## Object storage (S3 / Cloudflare R2)
+
+Default is local disk (`STORAGE_DRIVER=local`) — fine for single-node / ephemeral uploads.
+
+For production (OpsCtrl Starter has ephemeral disk), set:
+
+| Variable | Example (Cloudflare R2) |
+|----------|-------------------------|
+| `STORAGE_DRIVER` | `s3` |
+| `S3_BUCKET` | `flowpilot` |
+| `S3_ACCESS_KEY_ID` | R2 access key |
+| `S3_SECRET_ACCESS_KEY` | R2 secret |
+| `S3_ENDPOINT` | `https://<accountid>.r2.cloudflarestorage.com` |
+| `S3_REGION` | `auto` |
+| `S3_FORCE_PATH_STYLE` | `true` |
+
+Downloads redirect to short-lived signed URLs when using S3.  
+`GET /v1/health` includes `storageDriver: local|s3`.
 
 ## Google OAuth
 

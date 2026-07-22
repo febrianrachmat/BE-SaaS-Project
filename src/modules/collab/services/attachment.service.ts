@@ -1,15 +1,14 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createWriteStream, existsSync, mkdirSync, unlinkSync } from 'fs';
-import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { pipeline } from 'stream/promises';
-import { Readable } from 'stream';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { OBJECT_STORAGE } from '../../../infrastructure/storage/storage.module';
+import type { ObjectStorage } from '../../../infrastructure/storage/storage.types';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
 import { ProjectService } from '../../project/services/project.service';
 
@@ -26,20 +25,16 @@ const ALLOWED_MIME = new Set([
 
 @Injectable()
 export class AttachmentService {
-  private readonly uploadRoot: string;
   private readonly maxBytes: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectService,
+    @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
     config: ConfigService,
   ) {
-    this.uploadRoot = config.get<string>('STORAGE_LOCAL_PATH', './uploads');
     const maxMb = Number(config.get('MAX_FILE_SIZE_MB', 10));
     this.maxBytes = maxMb * 1024 * 1024;
-    if (!existsSync(this.uploadRoot)) {
-      mkdirSync(this.uploadRoot, { recursive: true });
-    }
   }
 
   async list(
@@ -58,7 +53,7 @@ export class AttachmentService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return rows.map((a) => this.toDto(a));
+    return Promise.all(rows.map((a) => this.toDto(a)));
   }
 
   async upload(
@@ -78,12 +73,9 @@ export class AttachmentService {
       throw new BadRequestException('File exceeds size limit');
     }
 
-    const key = `${ctx.workspaceId}/${taskId}/${randomUUID()}-${file.originalname}`;
-    const fullPath = join(this.uploadRoot, key);
-    const dir = join(this.uploadRoot, ctx.workspaceId, taskId);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-
-    await pipeline(Readable.from(file.buffer), createWriteStream(fullPath));
+    const safeName = this.sanitizeFileName(file.originalname);
+    const key = `${ctx.workspaceId}/${taskId}/${randomUUID()}-${safeName}`;
+    await this.storage.put(key, file.buffer, file.mimetype);
 
     const attachment = await this.prisma.attachment.create({
       data: {
@@ -132,14 +124,7 @@ export class AttachmentService {
       data: { deletedAt: new Date() },
     });
 
-    const fullPath = join(this.uploadRoot, existing.fileKey);
-    if (existsSync(fullPath)) {
-      try {
-        unlinkSync(fullPath);
-      } catch {
-        // ignore fs errors on soft delete
-      }
-    }
+    await this.storage.delete(existing.fileKey);
 
     await this.prisma.activityLog.create({
       data: {
@@ -154,25 +139,54 @@ export class AttachmentService {
     return { message: 'Attachment deleted' };
   }
 
-  getAbsolutePath(fileKey: string) {
-    return join(this.uploadRoot, fileKey);
-  }
-
-  async getForDownload(
+  async resolveDownload(
     ctx: WorkspaceContext,
     projectSlug: string,
     taskId: string,
     attachmentId: string,
-  ) {
+  ): Promise<
+    | { mode: 'redirect'; url: string; fileName: string; mimeType: string }
+    | {
+        mode: 'stream';
+        path: string;
+        fileName: string;
+        mimeType: string;
+      }
+  > {
     await this.requireTask(ctx, projectSlug, taskId);
     const attachment = await this.prisma.attachment.findFirst({
       where: { id: attachmentId, taskId, deletedAt: null },
     });
     if (!attachment) throw new NotFoundException('Attachment not found');
-    return attachment;
+
+    const signed = await this.storage.getDownloadUrl(
+      attachment.fileKey,
+      attachment.fileName,
+      3600,
+    );
+    if (signed) {
+      return {
+        mode: 'redirect',
+        url: signed,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+      };
+    }
+
+    const path = this.storage.getLocalPath(attachment.fileKey);
+    if (!path || !(await this.storage.exists(attachment.fileKey))) {
+      throw new NotFoundException('File missing on storage');
+    }
+
+    return {
+      mode: 'stream',
+      path,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+    };
   }
 
-  private toDto(a: {
+  private async toDto(a: {
     id: string;
     fileName: string;
     fileKey: string;
@@ -181,6 +195,11 @@ export class AttachmentService {
     createdAt: Date;
     uploadedBy: { id: string; name: string; email: string };
   }) {
+    const url =
+      this.storage.driver === 's3'
+        ? await this.storage.getDownloadUrl(a.fileKey, a.fileName, 3600)
+        : null;
+
     return {
       id: a.id,
       fileName: a.fileName,
@@ -189,7 +208,13 @@ export class AttachmentService {
       createdAt: a.createdAt.toISOString(),
       uploadedBy: a.uploadedBy,
       isImage: a.mimeType.startsWith('image/'),
+      url,
+      storageDriver: this.storage.driver,
     };
+  }
+
+  private sanitizeFileName(name: string): string {
+    return name.replace(/[^\w.\-()+ ]+/g, '_').slice(0, 180);
   }
 
   private async requireTask(

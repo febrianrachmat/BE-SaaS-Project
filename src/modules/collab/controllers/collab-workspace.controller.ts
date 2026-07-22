@@ -157,14 +157,19 @@ export class CollabWorkspaceController {
     @Param('attachmentId') attachmentId: string,
     @Res() res: express.Response,
   ) {
-    const attachment = await this.attachments.getForDownload(
+    const resolved = await this.attachments.resolveDownload(
       ctx,
       projectSlug,
       taskId,
       attachmentId,
     );
-    const path = this.attachments.getAbsolutePath(attachment.fileKey);
-    if (!existsSync(path)) {
+
+    if (resolved.mode === 'redirect') {
+      res.redirect(302, resolved.url);
+      return;
+    }
+
+    if (!existsSync(resolved.path)) {
       res.status(404).json({
         success: false,
         data: null,
@@ -174,12 +179,12 @@ export class CollabWorkspaceController {
       return;
     }
 
-    res.setHeader('Content-Type', attachment.mimeType);
+    res.setHeader('Content-Type', resolved.mimeType);
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${attachment.fileName}"`,
+      `attachment; filename="${resolved.fileName}"`,
     );
-    createReadStream(path).pipe(res);
+    createReadStream(resolved.path).pipe(res);
   }
 
   @Delete('projects/:projectSlug/tasks/:taskId/attachments/:attachmentId')

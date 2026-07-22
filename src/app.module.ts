@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { StorageModule } from './infrastructure/storage/storage.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
@@ -24,6 +25,7 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
       },
     ]),
     PrismaModule,
+    StorageModule,
     HealthModule,
     AuthModule,
     WorkspaceModule,

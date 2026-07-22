@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MailService } from '../auth/services/mail.service';
+import { OBJECT_STORAGE } from '../../infrastructure/storage/storage.module';
 import { HealthController } from './health.controller';
 
 describe('HealthController', () => {
@@ -13,6 +14,10 @@ describe('HealthController', () => {
           provide: MailService,
           useValue: { isConfigured: () => false },
         },
+        {
+          provide: OBJECT_STORAGE,
+          useValue: { driver: 'local' },
+        },
       ],
     }).compile();
 
@@ -25,6 +30,7 @@ describe('HealthController', () => {
       expect.objectContaining({
         status: 'ok',
         mailConfigured: false,
+        storageDriver: 'local',
       }),
     );
   });
