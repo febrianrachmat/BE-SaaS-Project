@@ -4,7 +4,8 @@ coverage
 .git
 .env
 .env.*
+.env.opsctrl
 uploads
 *.md
-Dockerfile
-.dockerignore
+.vscode
+.idea
