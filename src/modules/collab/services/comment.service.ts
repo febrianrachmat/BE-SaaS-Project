@@ -4,6 +4,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
 import { ProjectService } from '../../project/services/project.service';
 import { CreateCommentDto, UpdateCommentDto } from '../dto/collab.dto';
+import { RealtimeService } from '../../realtime/realtime.service';
 
 const MENTION_REGEX = /@([a-zA-Z0-9._-]+)/g;
 
@@ -12,6 +13,7 @@ export class CommentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async list(
@@ -87,6 +89,10 @@ export class CommentService {
           },
         },
       });
+      this.realtime.emitNotificationNew({
+        userId: task.assigneeId,
+        workspaceSlug: ctx.slug,
+      });
     }
 
     // Mention notifications by email local-part or name token
@@ -129,8 +135,21 @@ export class CommentService {
             },
           })),
         });
+        for (const u of mentionedUsers) {
+          this.realtime.emitNotificationNew({
+            userId: u.id,
+            workspaceSlug: ctx.slug,
+          });
+        }
       }
     }
+
+    this.realtime.emitTaskChanged({
+      workspaceSlug: ctx.slug,
+      projectSlug,
+      taskId,
+      action: 'updated',
+    });
 
     return {
       id: comment.id,

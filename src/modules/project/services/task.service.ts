@@ -19,6 +19,7 @@ import { ProjectService } from './project.service';
 import { toTaskDto, TaskDto, LabelDto } from '../mappers/project.mapper';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { RealtimeService } from '../../realtime/realtime.service';
 
 @Injectable()
 export class TaskService {
@@ -26,6 +27,7 @@ export class TaskService {
     private readonly tasks: TaskRepository,
     private readonly projects: ProjectService,
     private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   async create(
@@ -74,6 +76,13 @@ export class TaskService {
         action: 'TASK_CREATED',
         metadata: { title: task.title },
       },
+    });
+
+    this.realtime.emitTaskChanged({
+      workspaceSlug: ctx.slug,
+      projectSlug,
+      taskId: task.id,
+      action: 'created',
     });
 
     return toTaskDto(task);
@@ -174,6 +183,16 @@ export class TaskService {
       },
     });
 
+    this.realtime.emitTaskChanged({
+      workspaceSlug: ctx.slug,
+      projectSlug,
+      taskId,
+      action:
+        dto.status !== undefined && dto.position !== undefined
+          ? 'moved'
+          : 'updated',
+    });
+
     return toTaskDto(task);
   }
 
@@ -201,6 +220,13 @@ export class TaskService {
         actorId,
         action: 'TASK_DELETED',
       },
+    });
+
+    this.realtime.emitTaskChanged({
+      workspaceSlug: ctx.slug,
+      projectSlug,
+      taskId,
+      action: 'deleted',
     });
 
     return { message: 'Task deleted' };

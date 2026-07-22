@@ -61,6 +61,13 @@ CI runs on `main` / `develop`: install → prisma generate → lint → unit tes
    - `GOOGLE_CALLBACK_URL=https://flowpilot.opsctrl.dev/v1/auth/google/callback`
 4. Redeploy the API, then use **Continue with Google** on the Vercel login page.
 
+## Realtime (Socket.IO)
+
+- Namespace: `/realtime`
+- Clients authenticate via `access_token` cookie
+- Events: `task:changed`, `notification:new`
+- Ensure reverse proxy allows WebSocket upgrades (OpsCtrl default should)
+
 ## Security notes
 
 - Refresh tokens are hashed at rest and rotated on use

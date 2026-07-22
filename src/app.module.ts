@@ -9,6 +9,7 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { ProjectModule } from './modules/project/project.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CollabModule } from './modules/collab/collab.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CollabModule } from './modules/collab/collab.module';
     ProjectModule,
     DashboardModule,
     CollabModule,
+    RealtimeModule,
   ],
   providers: [
     {

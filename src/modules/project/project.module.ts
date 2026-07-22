@@ -4,8 +4,10 @@ import { ProjectRepository } from './repositories/project.repository';
 import { TaskRepository } from './repositories/task.repository';
 import { ProjectService } from './services/project.service';
 import { TaskService } from './services/task.service';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
+  imports: [RealtimeModule],
   controllers: [ProjectController],
   providers: [
     ProjectRepository,
