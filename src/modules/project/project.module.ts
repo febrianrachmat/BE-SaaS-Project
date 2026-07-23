@@ -6,6 +6,7 @@ import { TaskRepository } from './repositories/task.repository';
 import { ProjectService } from './services/project.service';
 import { ShareLinkService } from './services/share-link.service';
 import { TaskService } from './services/task.service';
+import { ProjectExportService } from './services/project-export.service';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationModule } from '../notification/notification.module';
 
@@ -18,6 +19,7 @@ import { NotificationModule } from '../notification/notification.module';
     ProjectService,
     TaskService,
     ShareLinkService,
+    ProjectExportService,
   ],
   exports: [ProjectService, TaskService],
 })

@@ -9,8 +9,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type * as express from 'express';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { AuthUser } from '../../../common/decorators/current-user.decorator';
 import { CurrentWorkspace } from '../../../common/decorators/current-workspace.decorator';
@@ -36,6 +39,7 @@ import { CreateShareLinkDto } from '../dto/share-link.dto';
 import { ProjectService } from '../services/project.service';
 import { ShareLinkService } from '../services/share-link.service';
 import { TaskService } from '../services/task.service';
+import { ProjectExportService } from '../services/project-export.service';
 
 @ApiTags('projects')
 @ApiBearerAuth()
@@ -46,6 +50,7 @@ export class ProjectController {
     private readonly projects: ProjectService,
     private readonly tasks: TaskService,
     private readonly shareLinks: ShareLinkService,
+    private readonly exports: ProjectExportService,
   ) {}
 
   @Post('projects')
@@ -88,6 +93,46 @@ export class ProjectController {
     @Param('projectSlug') projectSlug: string,
   ) {
     return this.projects.get(ctx, projectSlug, user.id);
+  }
+
+  @Get('projects/:projectSlug/export')
+  @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
+  @ApiOperation({ summary: 'Export project tasks as CSV or JSON' })
+  async exportProject(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+    @Query('format') formatRaw: string | undefined,
+    @Res() res: express.Response,
+  ) {
+    const format = (formatRaw ?? 'json').toLowerCase();
+    if (format !== 'json' && format !== 'csv') {
+      throw new BadRequestException('format must be json or csv');
+    }
+
+    const { payload, filenameBase } = await this.exports.build(
+      ctx,
+      projectSlug,
+      user.id,
+    );
+
+    if (format === 'csv') {
+      const csv = this.exports.toCsv(payload);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filenameBase}.csv"`,
+      );
+      res.send(csv);
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filenameBase}.json"`,
+    );
+    res.send(JSON.stringify(payload, null, 2));
   }
 
   @Patch('projects/:projectSlug')

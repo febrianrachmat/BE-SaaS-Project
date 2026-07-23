@@ -70,6 +70,22 @@ export class TaskRepository {
     });
   }
 
+  /** All non-deleted tasks including subtasks (for export). */
+  listAllByProject(projectId: string) {
+    return this.prisma.task.findMany({
+      where: {
+        projectId,
+        deletedAt: null,
+      },
+      include: taskInclude,
+      orderBy: [
+        { parentId: 'asc' },
+        { position: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    });
+  }
+
   listSubtasks(projectId: string, parentId: string) {
     return this.prisma.task.findMany({
       where: {
