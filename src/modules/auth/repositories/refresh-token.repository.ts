@@ -31,6 +31,23 @@ export class RefreshTokenRepository {
     return this.prisma.refreshToken.findUnique({ where: { tokenHash } });
   }
 
+  findByIdForUser(id: string, userId: string): Promise<RefreshToken | null> {
+    return this.prisma.refreshToken.findFirst({
+      where: { id, userId },
+    });
+  }
+
+  findActiveByUserId(userId: string): Promise<RefreshToken[]> {
+    return this.prisma.refreshToken.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async revoke(id: string, replacedById?: string): Promise<void> {
     await this.prisma.refreshToken.update({
       where: { id },
@@ -51,6 +68,20 @@ export class RefreshTokenRepository {
   async revokeAllForUser(userId: string): Promise<void> {
     await this.prisma.refreshToken.updateMany({
       where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async revokeAllExceptFamily(
+    userId: string,
+    keepFamilyId: string,
+  ): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+        NOT: { familyId: keepFamilyId },
+      },
       data: { revokedAt: new Date() },
     });
   }

@@ -15,6 +15,9 @@ import { RegisterUseCase } from './use-cases/register.use-case';
 import { LoginUseCase } from './use-cases/login.use-case';
 import { RefreshUseCase } from './use-cases/refresh.use-case';
 import { LogoutUseCase } from './use-cases/logout.use-case';
+import { ListSessionsUseCase } from './use-cases/list-sessions.use-case';
+import { RevokeSessionUseCase } from './use-cases/revoke-session.use-case';
+import { RevokeOtherSessionsUseCase } from './use-cases/revoke-other-sessions.use-case';
 import { VerifyEmailUseCase } from './use-cases/verify-email.use-case';
 import { ResendVerificationUseCase } from './use-cases/resend-verification.use-case';
 import { ForgotPasswordUseCase } from './use-cases/forgot-password.use-case';
@@ -46,6 +49,9 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     LoginUseCase,
     RefreshUseCase,
     LogoutUseCase,
+    ListSessionsUseCase,
+    RevokeSessionUseCase,
+    RevokeOtherSessionsUseCase,
     VerifyEmailUseCase,
     ResendVerificationUseCase,
     ForgotPasswordUseCase,

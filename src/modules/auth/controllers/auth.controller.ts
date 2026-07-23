@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -44,6 +45,9 @@ import { RegisterUseCase } from '../use-cases/register.use-case';
 import { LoginUseCase } from '../use-cases/login.use-case';
 import { RefreshUseCase } from '../use-cases/refresh.use-case';
 import { LogoutUseCase } from '../use-cases/logout.use-case';
+import { ListSessionsUseCase } from '../use-cases/list-sessions.use-case';
+import { RevokeSessionUseCase } from '../use-cases/revoke-session.use-case';
+import { RevokeOtherSessionsUseCase } from '../use-cases/revoke-other-sessions.use-case';
 import { VerifyEmailUseCase } from '../use-cases/verify-email.use-case';
 import { ResendVerificationUseCase } from '../use-cases/resend-verification.use-case';
 import { ForgotPasswordUseCase } from '../use-cases/forgot-password.use-case';
@@ -65,6 +69,9 @@ export class AuthController {
     private readonly loginUseCase: LoginUseCase,
     private readonly refreshUseCase: RefreshUseCase,
     private readonly logoutUseCase: LogoutUseCase,
+    private readonly listSessionsUseCase: ListSessionsUseCase,
+    private readonly revokeSessionUseCase: RevokeSessionUseCase,
+    private readonly revokeOtherSessionsUseCase: RevokeOtherSessionsUseCase,
     private readonly verifyEmailUseCase: VerifyEmailUseCase,
     private readonly resendVerificationUseCase: ResendVerificationUseCase,
     private readonly forgotPasswordUseCase: ForgotPasswordUseCase,
@@ -236,6 +243,57 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user' })
   async me(@CurrentUser() user: AuthUser) {
     return this.getMeUseCase.execute(user.id);
+  }
+
+  @Get('sessions')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'List active login sessions for the current user' })
+  async listSessions(
+    @CurrentUser() user: AuthUser,
+    @Req() req: express.Request,
+  ) {
+    const cookies = req.cookies as Record<string, string> | undefined;
+    return this.listSessionsUseCase.execute(user.id, cookies?.refresh_token);
+  }
+
+  @Delete('sessions/:sessionId')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Revoke a specific login session' })
+  async revokeSession(
+    @CurrentUser() user: AuthUser,
+    @Param('sessionId') sessionId: string,
+    @Req() req: express.Request,
+    @Res({ passthrough: true }) res: express.Response,
+  ) {
+    const cookies = req.cookies as Record<string, string> | undefined;
+    const result = await this.revokeSessionUseCase.execute(
+      user.id,
+      sessionId,
+      cookies?.refresh_token,
+    );
+    if (result.revokedCurrent) {
+      this.tokens.clearAuthCookies(res);
+    }
+    return result;
+  }
+
+  @Post('sessions/revoke-others')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Revoke all sessions except the current one' })
+  async revokeOtherSessions(
+    @CurrentUser() user: AuthUser,
+    @Req() req: express.Request,
+  ) {
+    const cookies = req.cookies as Record<string, string> | undefined;
+    return this.revokeOtherSessionsUseCase.execute(
+      user.id,
+      cookies?.refresh_token,
+    );
   }
 
   @Patch('me')
