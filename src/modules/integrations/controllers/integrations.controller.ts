@@ -88,6 +88,17 @@ export class IntegrationsController {
     return this.webhooks.listDeliveries(ctx, webhookId);
   }
 
+  @Post('webhooks/:webhookId/deliveries/:deliveryId/retry')
+  @RequirePermissions(PERMISSIONS.SETTINGS_MANAGE)
+  @ApiOperation({ summary: 'Retry a webhook delivery' })
+  retryWebhookDelivery(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('webhookId') webhookId: string,
+    @Param('deliveryId') deliveryId: string,
+  ) {
+    return this.webhooks.retryDelivery(ctx, webhookId, deliveryId);
+  }
+
   // ─── API keys ────────────────────────────────────────────────────────────
 
   @Get('api-keys')
@@ -118,5 +129,18 @@ export class IntegrationsController {
     @Param('apiKeyId') apiKeyId: string,
   ) {
     return this.apiKeys.revoke(ctx, apiKeyId);
+  }
+
+  @Post('api-keys/:apiKeyId/rotate')
+  @RequirePermissions(PERMISSIONS.SETTINGS_MANAGE)
+  @ApiOperation({
+    summary: 'Rotate an API key (revoke old, return new plaintext once)',
+  })
+  rotateApiKey(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @CurrentUser() user: AuthUser,
+    @Param('apiKeyId') apiKeyId: string,
+  ) {
+    return this.apiKeys.rotate(ctx, apiKeyId, user.id);
   }
 }

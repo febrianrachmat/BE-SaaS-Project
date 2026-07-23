@@ -89,6 +89,25 @@ export class ApiKeyService {
   }
 
   /**
+   * Revoke the current key and mint a replacement with the same name.
+   */
+  async rotate(
+    ctx: WorkspaceContext,
+    apiKeyId: string,
+    actorId: string,
+  ): Promise<CreatedApiKeyDto> {
+    const existing = await this.requireApiKey(ctx, apiKeyId);
+    if (existing.revokedAt) {
+      throw new NotFoundException('API key is already revoked');
+    }
+    await this.prisma.apiKey.update({
+      where: { id: apiKeyId },
+      data: { revokedAt: new Date() },
+    });
+    return this.create(ctx, actorId, { name: existing.name });
+  }
+
+  /**
    * Validate a plaintext API key. Returns workspace + creator user ids.
    */
   async validate(

@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { NotificationType, Webhook } from '@prisma/client';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -164,6 +164,40 @@ export class WebhookService {
       responseSnippet: row.responseSnippet,
       createdAt: row.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * Manually re-fire a delivery's event at the webhook (synthetic payload).
+   */
+  async retryDelivery(
+    ctx: WorkspaceContext,
+    webhookId: string,
+    deliveryId: string,
+  ): Promise<{ message: string }> {
+    const hook = await this.requireWebhook(ctx, webhookId);
+    const delivery = await this.prisma.webhookDelivery.findFirst({
+      where: { id: deliveryId, webhookId },
+    });
+    if (!delivery) {
+      throw new NotFoundException('Delivery not found');
+    }
+    if (!hook.isActive) {
+      throw new BadRequestException('Webhook is paused — resume it before retrying');
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const body = JSON.stringify({
+      event: delivery.event,
+      workspaceSlug: ctx.slug,
+      data: {
+        retried: true,
+        originalDeliveryId: delivery.id,
+      },
+      timestamp,
+    });
+
+    await this.deliverWithRetry(hook, delivery.event, body, timestamp);
+    return { message: 'Delivery retry queued' };
   }
 
   /**
