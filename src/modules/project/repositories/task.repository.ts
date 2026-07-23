@@ -41,33 +41,70 @@ export class TaskRepository {
       cycleId?: string;
       q?: string;
     },
+    pagination?: { skip: number; take: number },
   ) {
     return this.prisma.task.findMany({
-      where: {
-        projectId,
-        deletedAt: null,
-        parentId: null,
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.priority
-          ? { priority: filters.priority as Prisma.EnumTaskPriorityFilter['equals'] }
-          : {}),
-        ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
-        ...(filters.cycleId ? { cycleId: filters.cycleId } : {}),
-        ...(filters.labelId
-          ? { labels: { some: { labelId: filters.labelId } } }
-          : {}),
-        ...(filters.q
-          ? {
-              OR: [
-                { title: { contains: filters.q, mode: 'insensitive' } },
-                { description: { contains: filters.q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
+      where: this.listWhere(projectId, filters),
       include: taskInclude,
       orderBy: [{ position: 'asc' }, { createdAt: 'desc' }],
+      ...(pagination
+        ? { skip: pagination.skip, take: pagination.take }
+        : {}),
     });
+  }
+
+  countByProject(
+    projectId: string,
+    filters: {
+      status?: TaskStatus;
+      priority?: string;
+      assigneeId?: string;
+      labelId?: string;
+      cycleId?: string;
+      q?: string;
+    },
+  ) {
+    return this.prisma.task.count({
+      where: this.listWhere(projectId, filters),
+    });
+  }
+
+  private listWhere(
+    projectId: string,
+    filters: {
+      status?: TaskStatus;
+      priority?: string;
+      assigneeId?: string;
+      labelId?: string;
+      cycleId?: string;
+      q?: string;
+    },
+  ): Prisma.TaskWhereInput {
+    return {
+      projectId,
+      deletedAt: null,
+      parentId: null,
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.priority
+        ? {
+            priority:
+              filters.priority as Prisma.EnumTaskPriorityFilter['equals'],
+          }
+        : {}),
+      ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
+      ...(filters.cycleId ? { cycleId: filters.cycleId } : {}),
+      ...(filters.labelId
+        ? { labels: { some: { labelId: filters.labelId } } }
+        : {}),
+      ...(filters.q
+        ? {
+            OR: [
+              { title: { contains: filters.q, mode: 'insensitive' } },
+              { description: { contains: filters.q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
   }
 
   /** All non-deleted tasks including subtasks (for export). */

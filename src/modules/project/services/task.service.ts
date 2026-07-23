@@ -30,6 +30,10 @@ import {
   roleHasPermission,
   WorkspaceRoleName,
 } from '../../../common/constants/rbac';
+import {
+  buildPaginatedMeta,
+  getSkipTake,
+} from '../../../common/dto/pagination.dto';
 import { TaskRepository } from '../repositories/task.repository';
 import { ProjectService } from './project.service';
 import {
@@ -188,13 +192,43 @@ export class TaskService {
     projectSlug: string,
     query: TaskQueryDto,
     userId: string,
-  ): Promise<TaskDto[]> {
+  ): Promise<
+    | TaskDto[]
+    | {
+        data: TaskDto[];
+        meta: ReturnType<typeof buildPaginatedMeta>;
+      }
+  > {
     const project = await this.projects.requireAccessibleProject(
       ctx,
       projectSlug,
       userId,
     );
-    const rows = await this.tasks.listByProject(project.id, query);
+    const filters = {
+      status: query.status,
+      priority: query.priority,
+      assigneeId: query.assigneeId,
+      labelId: query.labelId,
+      cycleId: query.cycleId,
+      q: query.q,
+    };
+
+    // Paginate only when `page` is provided (list view). Kanban omits it.
+    if (query.page != null) {
+      const page = query.page;
+      const limit = query.limit ?? 20;
+      const { skip, take } = getSkipTake(page, limit);
+      const [rows, total] = await Promise.all([
+        this.tasks.listByProject(project.id, filters, { skip, take }),
+        this.tasks.countByProject(project.id, filters),
+      ]);
+      return {
+        data: rows.map(toTaskDto),
+        meta: buildPaginatedMeta(page, limit, total),
+      };
+    }
+
+    const rows = await this.tasks.listByProject(project.id, filters);
     return rows.map(toTaskDto);
   }
 

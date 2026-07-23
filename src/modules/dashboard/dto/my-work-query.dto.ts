@@ -1,7 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { TaskPriority, TaskStatus } from '@prisma/client';
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class MyWorkQueryDto {
   @ApiPropertyOptional({ enum: TaskStatus })
@@ -29,4 +38,19 @@ export class MyWorkQueryDto {
   })
   @IsBoolean()
   includeDone?: boolean | string;
+
+  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 100 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
 }

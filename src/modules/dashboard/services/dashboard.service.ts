@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
+import {
+  buildPaginatedMeta,
+  getSkipTake,
+} from '../../../common/dto/pagination.dto';
 
 export type DashboardOverview = {
   stats: {
@@ -71,6 +75,8 @@ export type MyWorkQuery = {
   priority?: string;
   q?: string;
   includeDone?: boolean;
+  page?: number;
+  limit?: number;
 };
 
 @Injectable()
@@ -81,48 +87,67 @@ export class DashboardService {
     ctx: WorkspaceContext,
     userId: string,
     query: MyWorkQuery = {},
-  ): Promise<MyWorkItem[]> {
+  ): Promise<{
+    data: MyWorkItem[];
+    meta: ReturnType<typeof buildPaginatedMeta>;
+  }> {
     const includeDone = query.includeDone === true;
-    const rows = await this.prisma.task.findMany({
-      where: {
-        deletedAt: null,
-        assigneeId: userId,
-        parentId: null,
-        ...(query.status ? { status: query.status } : {}),
-        ...(query.priority
-          ? { priority: query.priority as never }
-          : {}),
-        ...(query.q
-          ? {
-              OR: [
-                { title: { contains: query.q, mode: 'insensitive' } },
-                { description: { contains: query.q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-        ...(!includeDone && !query.status
-          ? { status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELED] } }
-          : {}),
-        project: {
-          workspaceId: ctx.workspaceId,
-          deletedAt: null,
-        },
-      },
-      include: {
-        project: { select: { name: true, slug: true, icon: true } },
-      },
-      orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
-      take: 200,
-    });
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const { skip, take } = getSkipTake(page, limit);
 
-    return rows.map((t) => ({
-      id: t.id,
-      title: t.title,
-      status: t.status,
-      priority: t.priority,
-      dueDate: t.dueDate?.toISOString() ?? null,
-      project: t.project,
-    }));
+    const where = {
+      deletedAt: null,
+      assigneeId: userId,
+      parentId: null,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.priority ? { priority: query.priority as never } : {}),
+      ...(query.q
+        ? {
+            OR: [
+              { title: { contains: query.q, mode: 'insensitive' as const } },
+              {
+                description: {
+                  contains: query.q,
+                  mode: 'insensitive' as const,
+                },
+              },
+            ],
+          }
+        : {}),
+      ...(!includeDone && !query.status
+        ? { status: { notIn: [TaskStatus.DONE, TaskStatus.CANCELED] } }
+        : {}),
+      project: {
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+      },
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.task.findMany({
+        where,
+        include: {
+          project: { select: { name: true, slug: true, icon: true } },
+        },
+        orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
+        skip,
+        take,
+      }),
+      this.prisma.task.count({ where }),
+    ]);
+
+    return {
+      data: rows.map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        dueDate: t.dueDate?.toISOString() ?? null,
+        project: t.project,
+      })),
+      meta: buildPaginatedMeta(page, limit, total),
+    };
   }
 
   async getOverview(

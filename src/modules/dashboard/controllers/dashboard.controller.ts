@@ -39,6 +39,8 @@ export class DashboardController {
       priority: query.priority,
       q: query.q,
       includeDone: query.includeDone === 'true' || query.includeDone === true,
+      page: query.page,
+      limit: query.limit,
     });
   }
 }
