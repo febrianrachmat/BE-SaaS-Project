@@ -163,6 +163,13 @@ export class TaskRepository {
     });
   }
 
+  restore(id: string) {
+    return this.prisma.task.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+  }
+
   setLabels(taskId: string, labelIds: string[]) {
     return this.prisma.$transaction(async (tx) => {
       await tx.taskLabel.deleteMany({ where: { taskId } });

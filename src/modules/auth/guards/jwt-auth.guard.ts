@@ -13,6 +13,7 @@ import type { AuthUser } from '../../../common/decorators/current-user.decorator
 export type ApiKeyAuthContext = {
   apiKeyId: string;
   workspaceId: string;
+  scopes: string[];
 };
 
 @Injectable()
@@ -50,6 +51,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       request.apiKeyAuth = {
         apiKeyId: validated.apiKeyId,
         workspaceId: validated.workspaceId,
+        scopes: validated.scopes,
       };
       return true;
     }
@@ -77,6 +79,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     user: AuthUser;
     apiKeyId: string;
     workspaceId: string;
+    scopes: string[];
   } | null> {
     if (!rawKey.startsWith('fp_live_')) return null;
 
@@ -87,6 +90,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
         id: true,
         workspaceId: true,
         createdById: true,
+        scopes: true,
         createdBy: {
           select: {
             id: true,
@@ -109,6 +113,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return {
       apiKeyId: row.id,
       workspaceId: row.workspaceId,
+      scopes: row.scopes ?? [],
       user: {
         id: row.createdBy.id,
         email: row.createdBy.email,

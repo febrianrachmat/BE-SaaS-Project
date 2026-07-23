@@ -4,16 +4,21 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { hashToken } from '../../../common/utils/crypto.util';
+import { SecurityAuditService } from '../../../common/services/security-audit.service';
 import { RefreshTokenRepository } from '../repositories/refresh-token.repository';
 
 @Injectable()
 export class RevokeSessionUseCase {
-  constructor(private readonly refreshTokens: RefreshTokenRepository) {}
+  constructor(
+    private readonly refreshTokens: RefreshTokenRepository,
+    private readonly audit: SecurityAuditService,
+  ) {}
 
   async execute(
     userId: string,
     sessionId: string,
     rawRefreshToken?: string,
+    meta?: { ip?: string; userAgent?: string },
   ): Promise<{ message: string; revokedCurrent: boolean }> {
     const token = await this.refreshTokens.findByIdForUser(sessionId, userId);
     if (!token) {
@@ -34,6 +39,15 @@ export class RevokeSessionUseCase {
     }
 
     await this.refreshTokens.revokeFamily(token.familyId);
+
+    await this.audit.write({
+      action: 'SESSION_REVOKED',
+      actorId: userId,
+      subjectId: userId,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+      metadata: { sessionId, revokedCurrent },
+    });
 
     return {
       message: revokedCurrent

@@ -59,6 +59,7 @@ import { GoogleAuthUseCase } from '../use-cases/google-auth.use-case';
 import { UploadAvatarUseCase } from '../use-cases/upload-avatar.use-case';
 import { NotificationPrefsService } from '../services/notification-prefs.service';
 import { TokenService } from '../services/token.service';
+import { SecurityAuditService } from '../../../common/services/security-audit.service';
 import type { GoogleProfilePayload } from '../strategies/google.strategy';
 
 @ApiTags('auth')
@@ -84,6 +85,7 @@ export class AuthController {
     private readonly uploadAvatarUseCase: UploadAvatarUseCase,
     private readonly tokens: TokenService,
     private readonly config: ConfigService,
+    private readonly audit: SecurityAuditService,
   ) {}
 
   private assertGoogleConfigured(): void {
@@ -197,7 +199,10 @@ export class AuthController {
   ) {
     const cookies = req.cookies as Record<string, string> | undefined;
     const raw = cookies?.refresh_token;
-    const result = await this.logoutUseCase.execute(raw);
+    const result = await this.logoutUseCase.execute(raw, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
     this.tokens.clearAuthCookies(res);
     return result;
   }
@@ -273,6 +278,7 @@ export class AuthController {
       user.id,
       sessionId,
       cookies?.refresh_token,
+      { ip: req.ip, userAgent: req.headers['user-agent'] },
     );
     if (result.revokedCurrent) {
       this.tokens.clearAuthCookies(res);
@@ -293,7 +299,16 @@ export class AuthController {
     return this.revokeOtherSessionsUseCase.execute(
       user.id,
       cookies?.refresh_token,
+      { ip: req.ip, userAgent: req.headers['user-agent'] },
     );
+  }
+
+  @Get('security-log')
+  @ApiBearerAuth()
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'List security events for the current account' })
+  listSecurityLog(@CurrentUser() user: AuthUser) {
+    return this.audit.listForUser(user.id);
   }
 
   @Patch('me')
@@ -350,8 +365,12 @@ export class AuthController {
   async changePassword(
     @CurrentUser() user: AuthUser,
     @Body() dto: ChangePasswordDto,
+    @Req() req: express.Request,
   ) {
-    return this.changePasswordUseCase.execute(user.id, dto);
+    return this.changePasswordUseCase.execute(user.id, dto, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Get('me/notification-preferences')

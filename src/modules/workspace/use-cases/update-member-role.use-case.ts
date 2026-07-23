@@ -11,6 +11,7 @@ import { toMemberDto, MemberDto } from '../mappers/workspace.mapper';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
 import { WORKSPACE_ROLE_RANK } from '../../../common/constants/rbac';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { SecurityAuditService } from '../../../common/services/security-audit.service';
 import { NotificationService } from '../../collab/services/notification.service';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class UpdateMemberRoleUseCase {
     private readonly members: WorkspaceMemberRepository,
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
+    private readonly audit: SecurityAuditService,
   ) {}
 
   async execute(
@@ -76,6 +78,18 @@ export class UpdateMemberRoleUseCase {
           from: member.role,
           to: dto.role,
         },
+      },
+    });
+
+    await this.audit.write({
+      action: 'ROLE_CHANGED',
+      actorId,
+      subjectId: member.userId,
+      workspaceId: ctx.workspaceId,
+      metadata: {
+        memberId,
+        from: member.role,
+        to: dto.role,
       },
     });
 

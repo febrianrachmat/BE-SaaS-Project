@@ -46,6 +46,7 @@ import {
   PreviewInvitationUseCase,
   ResendInvitationUseCase,
 } from '../use-cases/resend-preview-invitation.use-case';
+import { SecurityAuditService } from '../../../common/services/security-audit.service';
 
 @ApiTags('workspaces')
 @ApiBearerAuth()
@@ -69,6 +70,7 @@ export class WorkspaceController {
     private readonly updateMemberRole: UpdateMemberRoleUseCase,
     private readonly removeMemberUseCase: RemoveMemberUseCase,
     private readonly transferOwnership: TransferOwnershipUseCase,
+    private readonly audit: SecurityAuditService,
   ) {}
 
   @Post('workspaces')
@@ -105,6 +107,13 @@ export class WorkspaceController {
   @ApiOperation({ summary: 'Get workspace by slug' })
   get(@CurrentWorkspace() ctx: WorkspaceContext) {
     return this.getWorkspace.execute(ctx);
+  }
+
+  @Get('workspaces/:slug/security-log')
+  @RequirePermissions(PERMISSIONS.SETTINGS_MANAGE)
+  @ApiOperation({ summary: 'List workspace security audit events' })
+  securityLog(@CurrentWorkspace() ctx: WorkspaceContext) {
+    return this.audit.listForWorkspace(ctx.workspaceId);
   }
 
   @Patch('workspaces/:slug')

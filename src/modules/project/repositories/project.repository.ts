@@ -59,6 +59,13 @@ export class ProjectRepository {
     });
   }
 
+  restore(id: string) {
+    return this.prisma.project.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+  }
+
   addFavorite(projectId: string, userId: string) {
     return this.prisma.projectFavorite.upsert({
       where: { projectId_userId: { projectId, userId } },

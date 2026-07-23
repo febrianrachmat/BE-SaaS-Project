@@ -64,4 +64,15 @@ export class CreateApiKeyDto {
   @MinLength(1)
   @MaxLength(100)
   name!: string;
+
+  @ApiPropertyOptional({
+    example: ['workspace:view', 'project:create', 'task:update'],
+    type: [String],
+    description:
+      'Permission scopes. Empty/omitted = unrestricted (creator role permissions).',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scopes?: string[];
 }

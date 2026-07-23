@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { SecurityAuditService } from '../../../common/services/security-audit.service';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { UserRepository } from '../repositories/user.repository';
 import { PasswordService } from '../services/password.service';
@@ -12,11 +13,13 @@ export class ChangePasswordUseCase {
   constructor(
     private readonly users: UserRepository,
     private readonly passwords: PasswordService,
+    private readonly audit: SecurityAuditService,
   ) {}
 
   async execute(
     userId: string,
     dto: ChangePasswordDto,
+    meta?: { ip?: string; userAgent?: string },
   ): Promise<{ message: string }> {
     const user = await this.users.findById(userId);
     if (!user) {
@@ -45,6 +48,14 @@ export class ChangePasswordUseCase {
 
     const passwordHash = await this.passwords.hash(dto.newPassword);
     await this.users.updatePassword(userId, passwordHash);
+
+    await this.audit.write({
+      action: 'PASSWORD_CHANGED',
+      actorId: userId,
+      subjectId: userId,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
 
     return { message: 'Password updated' };
   }

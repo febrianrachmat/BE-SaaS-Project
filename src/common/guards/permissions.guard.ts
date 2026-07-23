@@ -17,6 +17,7 @@ import {
 } from '../constants/rbac';
 import { AuthUser } from '../decorators/current-user.decorator';
 import { WorkspaceContext } from '../decorators/current-workspace.decorator';
+import { apiKeyAllowsPermission } from '../utils/api-key-scopes.util';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -48,7 +49,7 @@ export class PermissionsGuard implements CanActivate {
       user?: AuthUser;
       params: { slug?: string; workspaceSlug?: string };
       workspaceContext?: WorkspaceContext;
-      apiKeyAuth?: { apiKeyId: string; workspaceId: string };
+      apiKeyAuth?: { apiKeyId: string; workspaceId: string; scopes: string[] };
     }>();
 
     const user = request.user;
@@ -111,6 +112,17 @@ export class PermissionsGuard implements CanActivate {
 
     if (!allowed) {
       throw new ForbiddenException('Insufficient permissions');
+    }
+
+    if (request.apiKeyAuth) {
+      const scoped = required.every((permission) =>
+        apiKeyAllowsPermission(request.apiKeyAuth!.scopes, permission),
+      );
+      if (!scoped) {
+        throw new ForbiddenException(
+          'API key scopes do not allow this action',
+        );
+      }
     }
 
     request.workspaceContext = {

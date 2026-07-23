@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { generateSecureToken, hashToken } from '../../../common/utils/crypto.util';
+import { SecurityAuditService } from '../../../common/services/security-audit.service';
 import { LoginDto } from '../dto/login.dto';
 import { UserRepository } from '../repositories/user.repository';
 import { RefreshTokenRepository } from '../repositories/refresh-token.repository';
@@ -25,6 +26,7 @@ export class LoginUseCase {
     private readonly refreshTokens: RefreshTokenRepository,
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
+    private readonly audit: SecurityAuditService,
   ) {}
 
   async execute(
@@ -35,10 +37,23 @@ export class LoginUseCase {
     const user = await this.users.findByEmail(email);
 
     if (!user) {
+      await this.audit.write({
+        action: 'LOGIN_FAILED',
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { email, reason: 'unknown_user' },
+      });
       throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.passwordHash) {
+      await this.audit.write({
+        action: 'LOGIN_FAILED',
+        subjectId: user.id,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { email, reason: 'oauth_only' },
+      });
       throw new UnauthorizedException(
         'This account uses Google sign-in. Continue with Google instead.',
       );
@@ -46,6 +61,13 @@ export class LoginUseCase {
 
     const valid = await this.passwords.verify(dto.password, user.passwordHash);
     if (!valid) {
+      await this.audit.write({
+        action: 'LOGIN_FAILED',
+        subjectId: user.id,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+        metadata: { email, reason: 'bad_password' },
+      });
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -64,6 +86,15 @@ export class LoginUseCase {
       expiresAt: this.tokens.getRefreshExpiresAt(rememberMe),
       userAgent: meta.userAgent,
       ip: meta.ip,
+    });
+
+    await this.audit.write({
+      action: 'LOGIN',
+      actorId: user.id,
+      subjectId: user.id,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { method: 'password' },
     });
 
     return {

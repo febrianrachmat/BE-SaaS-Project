@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -13,6 +14,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import type * as express from 'express';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import type { AuthUser } from '../../../common/decorators/current-user.decorator';
 import { CurrentWorkspace } from '../../../common/decorators/current-workspace.decorator';
@@ -117,8 +119,12 @@ export class IntegrationsController {
     @CurrentWorkspace() ctx: WorkspaceContext,
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateApiKeyDto,
+    @Req() req: express.Request,
   ) {
-    return this.apiKeys.create(ctx, user.id, dto);
+    return this.apiKeys.create(ctx, user.id, dto, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('api-keys/:apiKeyId/revoke')
@@ -126,9 +132,14 @@ export class IntegrationsController {
   @ApiOperation({ summary: 'Revoke an API key' })
   revokeApiKey(
     @CurrentWorkspace() ctx: WorkspaceContext,
+    @CurrentUser() user: AuthUser,
     @Param('apiKeyId') apiKeyId: string,
+    @Req() req: express.Request,
   ) {
-    return this.apiKeys.revoke(ctx, apiKeyId);
+    return this.apiKeys.revoke(ctx, apiKeyId, user.id, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 
   @Post('api-keys/:apiKeyId/rotate')
@@ -140,7 +151,11 @@ export class IntegrationsController {
     @CurrentWorkspace() ctx: WorkspaceContext,
     @CurrentUser() user: AuthUser,
     @Param('apiKeyId') apiKeyId: string,
+    @Req() req: express.Request,
   ) {
-    return this.apiKeys.rotate(ctx, apiKeyId, user.id);
+    return this.apiKeys.rotate(ctx, apiKeyId, user.id, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   }
 }

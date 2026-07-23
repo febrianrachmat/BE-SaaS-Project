@@ -40,6 +40,7 @@ import { ProjectService } from '../services/project.service';
 import { ShareLinkService } from '../services/share-link.service';
 import { TaskService } from '../services/task.service';
 import { ProjectExportService } from '../services/project-export.service';
+import { TrashService } from '../services/trash.service';
 
 @ApiTags('projects')
 @ApiBearerAuth()
@@ -51,6 +52,7 @@ export class ProjectController {
     private readonly tasks: TaskService,
     private readonly shareLinks: ShareLinkService,
     private readonly exports: ProjectExportService,
+    private readonly trash: TrashService,
   ) {}
 
   @Post('projects')
@@ -188,6 +190,38 @@ export class ProjectController {
     @Param('projectSlug') projectSlug: string,
   ) {
     return this.projects.remove(ctx, projectSlug, user.id);
+  }
+
+  @Get('trash')
+  @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
+  @ApiOperation({ summary: 'List soft-deleted projects and tasks' })
+  listTrash(@CurrentWorkspace() ctx: WorkspaceContext) {
+    return this.trash.list(ctx);
+  }
+
+  @Post('projects/:projectSlug/restore')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.PROJECT_DELETE)
+  @ApiOperation({ summary: 'Restore a soft-deleted project' })
+  restoreProject(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+  ) {
+    return this.trash.restoreProject(ctx, projectSlug, user.id);
+  }
+
+  @Post('projects/:projectSlug/tasks/:taskId/restore')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.TASK_DELETE)
+  @ApiOperation({ summary: 'Restore a soft-deleted task' })
+  restoreTask(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+    @Param('taskId') taskId: string,
+  ) {
+    return this.trash.restoreTask(ctx, projectSlug, taskId, user.id);
   }
 
   @Get('projects/:projectSlug/members')

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { generateSecureToken, hashToken } from '../../../common/utils/crypto.util';
+import { SecurityAuditService } from '../../../common/services/security-audit.service';
 import { UserRepository } from '../repositories/user.repository';
 import { RefreshTokenRepository } from '../repositories/refresh-token.repository';
 import { TokenService } from '../services/token.service';
@@ -14,6 +15,7 @@ export class GoogleAuthUseCase {
     private readonly users: UserRepository,
     private readonly refreshTokens: RefreshTokenRepository,
     private readonly tokens: TokenService,
+    private readonly audit: SecurityAuditService,
   ) {}
 
   async execute(
@@ -57,6 +59,15 @@ export class GoogleAuthUseCase {
       expiresAt: this.tokens.getRefreshExpiresAt(false),
       userAgent: meta.userAgent,
       ip: meta.ip,
+    });
+
+    await this.audit.write({
+      action: 'LOGIN',
+      actorId: user.id,
+      subjectId: user.id,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+      metadata: { method: 'google' },
     });
 
     return {

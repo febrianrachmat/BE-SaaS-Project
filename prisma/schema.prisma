@@ -153,6 +153,8 @@ model User {
   webhooks              Webhook[]
   apiKeys               ApiKey[]
   projectShareLinks     ProjectShareLink[]
+  securityAuditLogs     SecurityAuditLog[] @relation("SecurityAuditActor")
+  securityAuditSubjects SecurityAuditLog[] @relation("SecurityAuditSubject")
 
   @@index([deletedAt])
   @@map("users")
@@ -232,6 +234,7 @@ model Workspace {
   templates   ProjectTemplate[]
   webhooks    Webhook[]
   apiKeys     ApiKey[]
+  securityAuditLogs SecurityAuditLog[]
 
   @@index([ownerId])
   @@index([deletedAt])
@@ -638,6 +641,8 @@ model ApiKey {
   name        String
   keyHash     String    @unique @map("key_hash")
   keyPrefix   String    @map("key_prefix")
+  /// Permission strings (e.g. workspace:view). Empty = legacy unrestricted (creator RBAC only).
+  scopes      String[]  @default([])
   createdById String    @map("created_by_id") @db.Uuid
   lastUsedAt  DateTime? @map("last_used_at")
   revokedAt   DateTime? @map("revoked_at")
@@ -648,4 +653,39 @@ model ApiKey {
 
   @@index([workspaceId])
   @@map("api_keys")
+}
+
+enum SecurityAuditAction {
+  LOGIN
+  LOGIN_FAILED
+  LOGOUT
+  SESSION_REVOKED
+  SESSIONS_REVOKED_OTHERS
+  API_KEY_CREATED
+  API_KEY_REVOKED
+  API_KEY_ROTATED
+  PASSWORD_CHANGED
+  ROLE_CHANGED
+}
+
+model SecurityAuditLog {
+  id          String              @id @default(uuid()) @db.Uuid
+  action      SecurityAuditAction
+  actorId     String?             @map("actor_id") @db.Uuid
+  subjectId   String?             @map("subject_id") @db.Uuid
+  workspaceId String?             @map("workspace_id") @db.Uuid
+  ip          String?
+  userAgent   String?             @map("user_agent")
+  metadata    Json?
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  actor     User?      @relation("SecurityAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  subject   User?      @relation("SecurityAuditSubject", fields: [subjectId], references: [id], onDelete: SetNull)
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([subjectId, createdAt])
+  @@index([workspaceId, createdAt])
+  @@index([action, createdAt])
+  @@map("security_audit_logs")
 }
