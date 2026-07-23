@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/nestjs';
 
 interface ErrorBody {
   success: false;
@@ -64,6 +65,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${request.method} ${request.url} — ${exception.message}`,
         exception.stack,
       );
+    }
+
+    if (status >= 500) {
+      Sentry.captureException(exception, {
+        tags: {
+          path: request.url,
+          method: request.method,
+        },
+      });
     }
 
     const body: ErrorBody = {
