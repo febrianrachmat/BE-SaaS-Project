@@ -75,4 +75,32 @@ describe('API smoke (e2e)', () => {
   it('GET /v1/auth/me requires auth', async () => {
     await request(app.getHttpServer()).get('/v1/auth/me').expect(401);
   });
+
+  it('GET /v1/share/:token returns 404 for unknown token', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/v1/share/fps_not_a_real_token')
+      .expect(404);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('GET workspace search requires auth', async () => {
+    await request(app.getHttpServer())
+      .get('/v1/workspaces/demo/search?q=test')
+      .expect(401);
+  });
+
+  it('POST bulk tasks requires auth', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/workspaces/demo/projects/demo/tasks/bulk')
+      .send({ action: 'update', taskIds: [], patch: { status: 'TODO' } })
+      .expect(401);
+  });
+
+  it('GET webhook deliveries requires auth', async () => {
+    await request(app.getHttpServer())
+      .get(
+        '/v1/workspaces/demo/webhooks/00000000-0000-4000-8000-000000000000/deliveries',
+      )
+      .expect(401);
+  });
 });

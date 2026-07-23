@@ -52,6 +52,23 @@ async function main() {
     failures.push(`API readiness: ${error.message}`);
   }
 
+  try {
+    await check(
+      'Share link unknown token',
+      `${apiUrl}/share/fps_smoke_missing_token`,
+      (res, json) => {
+        if (res.status !== 404) {
+          throw new Error(`expected 404, got ${res.status}`);
+        }
+        if (json?.success !== false) {
+          throw new Error('expected success=false payload');
+        }
+      },
+    );
+  } catch (error) {
+    failures.push(`Share link: ${error.message}`);
+  }
+
   if (webUrl) {
     try {
       await check('Web home', webUrl, (res) => {
@@ -71,6 +88,16 @@ async function main() {
       });
     } catch (error) {
       failures.push(`Web login: ${error.message}`);
+    }
+
+    try {
+      await check('Web share page', `${webUrl}/share/fps_smoke_missing`, (res) => {
+        if (res.status < 200 || res.status >= 400) {
+          throw new Error(`expected 2xx/3xx, got ${res.status}`);
+        }
+      });
+    } catch (error) {
+      failures.push(`Web share page: ${error.message}`);
     }
   }
 

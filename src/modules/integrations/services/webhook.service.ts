@@ -18,6 +18,19 @@ export type WebhookDto = {
   updatedAt: string;
 };
 
+export type WebhookDeliveryDto = {
+  id: string;
+  webhookId: string;
+  event: string;
+  success: boolean;
+  statusCode: number | null;
+  attempt: number;
+  responseSnippet: string | null;
+  createdAt: string;
+};
+
+const SNIPPET_MAX = 280;
+
 /** Map in-app notification types to webhook event names. */
 export const NOTIFICATION_TYPE_TO_WEBHOOK_EVENT: Partial<
   Record<NotificationType, string>
@@ -131,6 +144,28 @@ export class WebhookService {
     return { message: 'Webhook deleted' };
   }
 
+  async listDeliveries(
+    ctx: WorkspaceContext,
+    webhookId: string,
+  ): Promise<WebhookDeliveryDto[]> {
+    await this.requireWebhook(ctx, webhookId);
+    const rows = await this.prisma.webhookDelivery.findMany({
+      where: { webhookId },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      webhookId: row.webhookId,
+      event: row.event,
+      success: row.success,
+      statusCode: row.statusCode,
+      attempt: row.attempt,
+      responseSnippet: row.responseSnippet,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
   /**
    * Fire matching active webhooks asynchronously (never blocks the caller).
    */
@@ -222,6 +257,17 @@ export class WebhookService {
           body,
           signal: AbortSignal.timeout(10_000),
         });
+        const responseText = await res.text().catch(() => '');
+        const snippet = this.truncateSnippet(responseText || res.statusText);
+
+        await this.recordDelivery({
+          webhookId: hook.id,
+          event,
+          success: res.ok,
+          statusCode: res.status,
+          attempt: attempt + 1,
+          responseSnippet: snippet,
+        });
 
         if (res.ok) {
           await this.prisma.webhook.update({
@@ -239,12 +285,53 @@ export class WebhookService {
           return;
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(
-          `Webhook ${hook.id} network error for ${event} (attempt ${attempt + 1}): ${
-            err instanceof Error ? err.message : String(err)
-          }`,
+          `Webhook ${hook.id} network error for ${event} (attempt ${attempt + 1}): ${message}`,
         );
+        await this.recordDelivery({
+          webhookId: hook.id,
+          event,
+          success: false,
+          statusCode: null,
+          attempt: attempt + 1,
+          responseSnippet: this.truncateSnippet(message),
+        });
       }
+    }
+  }
+
+  private truncateSnippet(value: string): string {
+    const cleaned = value.replace(/\s+/g, ' ').trim();
+    if (cleaned.length <= SNIPPET_MAX) return cleaned;
+    return `${cleaned.slice(0, SNIPPET_MAX)}…`;
+  }
+
+  private async recordDelivery(input: {
+    webhookId: string;
+    event: string;
+    success: boolean;
+    statusCode: number | null;
+    attempt: number;
+    responseSnippet: string | null;
+  }): Promise<void> {
+    try {
+      await this.prisma.webhookDelivery.create({
+        data: {
+          webhookId: input.webhookId,
+          event: input.event,
+          success: input.success,
+          statusCode: input.statusCode,
+          attempt: input.attempt,
+          responseSnippet: input.responseSnippet,
+        },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to persist webhook delivery: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
 

@@ -78,6 +78,16 @@ export class IntegrationsController {
     return this.webhooks.remove(ctx, webhookId);
   }
 
+  @Get('webhooks/:webhookId/deliveries')
+  @RequirePermissions(PERMISSIONS.SETTINGS_MANAGE)
+  @ApiOperation({ summary: 'List recent webhook delivery attempts' })
+  listWebhookDeliveries(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('webhookId') webhookId: string,
+  ) {
+    return this.webhooks.listDeliveries(ctx, webhookId);
+  }
+
   // ─── API keys ────────────────────────────────────────────────────────────
 
   @Get('api-keys')

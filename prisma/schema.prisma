@@ -608,11 +608,28 @@ model Webhook {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdBy User      @relation(fields: [createdById], references: [id])
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy  User              @relation(fields: [createdById], references: [id])
+  deliveries WebhookDelivery[]
 
   @@index([workspaceId, isActive])
   @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id              String   @id @default(uuid()) @db.Uuid
+  webhookId       String   @map("webhook_id") @db.Uuid
+  event           String
+  success         Boolean
+  statusCode      Int?     @map("status_code")
+  attempt         Int
+  responseSnippet String?  @map("response_snippet")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+  @@map("webhook_deliveries")
 }
 
 model ApiKey {
