@@ -37,6 +37,8 @@ export class TaskRepository {
       status?: TaskStatus;
       priority?: string;
       assigneeId?: string;
+      labelId?: string;
+      cycleId?: string;
       q?: string;
     },
   ) {
@@ -50,6 +52,10 @@ export class TaskRepository {
           ? { priority: filters.priority as Prisma.EnumTaskPriorityFilter['equals'] }
           : {}),
         ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
+        ...(filters.cycleId ? { cycleId: filters.cycleId } : {}),
+        ...(filters.labelId
+          ? { labels: { some: { labelId: filters.labelId } } }
+          : {}),
         ...(filters.q
           ? {
               OR: [

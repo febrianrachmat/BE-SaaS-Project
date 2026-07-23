@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -18,7 +19,12 @@ import type { WorkspaceContext } from '../../../common/decorators/current-worksp
 import { RequirePermissions } from '../../../common/decorators/permissions.decorator';
 import { PERMISSIONS } from '../../../common/constants/rbac';
 import { CycleService } from '../services/cycle.service';
-import { CreateCycleDto, UpdateCycleDto } from '../dto/cycle.dto';
+import {
+  AddCycleTaskDto,
+  CreateCycleDto,
+  CycleCandidatesQueryDto,
+  UpdateCycleDto,
+} from '../dto/cycle.dto';
 
 @ApiTags('cycles')
 @ApiBearerAuth()
@@ -32,6 +38,49 @@ export class CycleController {
   @ApiOperation({ summary: 'List workspace cycles / sprints' })
   list(@CurrentWorkspace() ctx: WorkspaceContext) {
     return this.cycles.list(ctx);
+  }
+
+  @Get(':cycleId/board')
+  @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
+  @ApiOperation({ summary: 'Cycle board with tasks and progress' })
+  board(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('cycleId') cycleId: string,
+  ) {
+    return this.cycles.getBoard(ctx, cycleId);
+  }
+
+  @Get(':cycleId/candidates')
+  @RequirePermissions(PERMISSIONS.WORKSPACE_VIEW)
+  @ApiOperation({ summary: 'Tasks that can be added to this cycle' })
+  candidates(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('cycleId') cycleId: string,
+    @Query() query: CycleCandidatesQueryDto,
+  ) {
+    return this.cycles.listCandidates(ctx, cycleId, query.q);
+  }
+
+  @Post(':cycleId/tasks')
+  @RequirePermissions(PERMISSIONS.TASK_UPDATE)
+  @ApiOperation({ summary: 'Add a task to this cycle' })
+  addTask(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('cycleId') cycleId: string,
+    @Body() dto: AddCycleTaskDto,
+  ) {
+    return this.cycles.addTask(ctx, cycleId, dto.taskId);
+  }
+
+  @Delete(':cycleId/tasks/:taskId')
+  @RequirePermissions(PERMISSIONS.TASK_UPDATE)
+  @ApiOperation({ summary: 'Remove a task from this cycle' })
+  removeTask(
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('cycleId') cycleId: string,
+    @Param('taskId') taskId: string,
+  ) {
+    return this.cycles.removeTask(ctx, cycleId, taskId);
   }
 
   @Post()

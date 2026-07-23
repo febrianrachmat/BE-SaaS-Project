@@ -103,6 +103,8 @@ export type TaskDependenciesDto = {
 
 export type RoadmapTaskDto = TaskDto & {
   startDate: string;
+  /** Task ids this task blocks (BLOCKS edges). */
+  blocksTaskIds: string[];
   project: { id: string; name: string; slug: string; icon: string | null };
 };
 

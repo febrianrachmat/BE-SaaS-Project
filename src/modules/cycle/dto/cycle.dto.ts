@@ -1,18 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CycleStatus } from '@prisma/client';
 import {
   IsDateString,
   IsEnum,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { CycleStatus } from '@prisma/client';
 
 export class CreateCycleDto {
-  @ApiProperty({ example: 'Sprint 12' })
+  @ApiProperty({ example: 'Sprint 14' })
   @IsString()
-  @MinLength(1)
+  @MinLength(2)
   @MaxLength(100)
   name!: string;
 
@@ -42,7 +43,7 @@ export class UpdateCycleDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MinLength(1)
+  @MinLength(2)
   @MaxLength(100)
   name?: string;
 
@@ -66,4 +67,18 @@ export class UpdateCycleDto {
   @IsOptional()
   @IsDateString()
   endDate?: string | null;
+}
+
+export class AddCycleTaskDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  taskId!: string;
+}
+
+export class CycleCandidatesQueryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  q?: string;
 }

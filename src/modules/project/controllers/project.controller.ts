@@ -19,6 +19,7 @@ import { RequirePermissions } from '../../../common/decorators/permissions.decor
 import { PERMISSIONS } from '../../../common/constants/rbac';
 import { CreateProjectDto, UpdateProjectDto, AddProjectMemberDto } from '../dto/project.dto';
 import {
+  BulkTaskActionDto,
   CreateChecklistItemDto,
   CreateLabelDto,
   CreateTaskDto,
@@ -31,7 +32,9 @@ import {
   UpdateLabelDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
+import { CreateShareLinkDto } from '../dto/share-link.dto';
 import { ProjectService } from '../services/project.service';
+import { ShareLinkService } from '../services/share-link.service';
 import { TaskService } from '../services/task.service';
 
 @ApiTags('projects')
@@ -42,6 +45,7 @@ export class ProjectController {
   constructor(
     private readonly projects: ProjectService,
     private readonly tasks: TaskService,
+    private readonly shareLinks: ShareLinkService,
   ) {}
 
   @Post('projects')
@@ -217,6 +221,19 @@ export class ProjectController {
     return this.tasks.listSubtasks(ctx, projectSlug, taskId, user.id);
   }
 
+  @Post('projects/:projectSlug/tasks/bulk')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.TASK_UPDATE)
+  @ApiOperation({ summary: 'Bulk update or delete tasks' })
+  bulkTasks(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: BulkTaskActionDto,
+  ) {
+    return this.tasks.bulk(ctx, projectSlug, user.id, dto);
+  }
+
   @Patch('projects/:projectSlug/tasks/:taskId')
   @RequirePermissions(PERMISSIONS.TASK_UPDATE)
   updateTask(
@@ -377,5 +394,45 @@ export class ProjectController {
     @Param('labelId') labelId: string,
   ) {
     return this.tasks.deleteLabel(ctx, labelId);
+  }
+
+  @Get('projects/:projectSlug/share-links')
+  @RequirePermissions(PERMISSIONS.PROJECT_UPDATE)
+  @ApiOperation({ summary: 'List project share links' })
+  listShareLinks(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+  ) {
+    return this.shareLinks.list(ctx, projectSlug, user.id);
+  }
+
+  @Post('projects/:projectSlug/share-links')
+  @RequirePermissions(PERMISSIONS.PROJECT_UPDATE)
+  @ApiOperation({ summary: 'Create a read-only project share link' })
+  createShareLink(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+    @Body() dto: CreateShareLinkDto,
+  ) {
+    return this.shareLinks.create(
+      ctx,
+      projectSlug,
+      user.id,
+      dto.expiresInDays,
+    );
+  }
+
+  @Delete('projects/:projectSlug/share-links/:linkId')
+  @RequirePermissions(PERMISSIONS.PROJECT_UPDATE)
+  @ApiOperation({ summary: 'Revoke a project share link' })
+  revokeShareLink(
+    @CurrentUser() user: AuthUser,
+    @CurrentWorkspace() ctx: WorkspaceContext,
+    @Param('projectSlug') projectSlug: string,
+    @Param('linkId') linkId: string,
+  ) {
+    return this.shareLinks.revoke(ctx, projectSlug, linkId, user.id);
   }
 }

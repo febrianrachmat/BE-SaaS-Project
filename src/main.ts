@@ -8,10 +8,26 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
+import { RedisIoAdapter } from './modules/realtime/redis-io.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+
+  const redisUrl = config.get<string>('REDIS_URL')?.trim();
+  if (redisUrl) {
+    const redisAdapter = new RedisIoAdapter(app);
+    try {
+      await redisAdapter.connectToRedis(redisUrl);
+      app.useWebSocketAdapter(redisAdapter);
+    } catch (err) {
+      console.warn(
+        `Socket.IO Redis adapter failed, using in-memory: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
 
   const port = config.get<number>('PORT', 4000);
   const frontendUrl = config.get<string>(

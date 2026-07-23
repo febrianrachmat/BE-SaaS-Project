@@ -88,6 +88,45 @@ export class ApiKeyService {
     return toApiKeyDto(row);
   }
 
+  /**
+   * Validate a plaintext API key. Returns workspace + creator user ids.
+   */
+  async validate(
+    rawKey: string,
+  ): Promise<{
+    apiKeyId: string;
+    workspaceId: string;
+    userId: string;
+  } | null> {
+    const trimmed = rawKey.trim();
+    if (!trimmed.startsWith('fp_live_')) return null;
+
+    const keyHash = hashToken(trimmed);
+    const row = await this.prisma.apiKey.findFirst({
+      where: { keyHash, revokedAt: null },
+      select: {
+        id: true,
+        workspaceId: true,
+        createdById: true,
+      },
+    });
+    if (!row) return null;
+
+    // Fire-and-forget last used stamp
+    void this.prisma.apiKey
+      .update({
+        where: { id: row.id },
+        data: { lastUsedAt: new Date() },
+      })
+      .catch(() => undefined);
+
+    return {
+      apiKeyId: row.id,
+      workspaceId: row.workspaceId,
+      userId: row.createdById,
+    };
+  }
+
   private async requireApiKey(
     ctx: WorkspaceContext,
     apiKeyId: string,

@@ -82,10 +82,10 @@ export class RealtimeGateway
     }
   }
 
-  handleDisconnect(client: Socket): void {
-    const entry = this.realtime.removePresence(client.id);
+  async handleDisconnect(client: Socket): Promise<void> {
+    const entry = await this.realtime.removePresence(client.id);
     if (entry) {
-      this.realtime.emitPresenceUpdate(entry.workspaceSlug);
+      await this.realtime.emitPresenceUpdate(entry.workspaceSlug);
     }
   }
 
@@ -135,40 +135,40 @@ export class RealtimeGateway
 
     const previous = this.realtime.getPresence(client.id);
     if (previous && previous.workspaceSlug !== workspaceSlug) {
-      this.realtime.removePresence(client.id);
-      this.realtime.emitPresenceUpdate(previous.workspaceSlug);
+      await this.realtime.removePresence(client.id);
+      await this.realtime.emitPresenceUpdate(previous.workspaceSlug);
     }
 
     const projectSlug = body?.projectSlug?.trim() || undefined;
 
     await client.join(`workspace:${workspaceSlug}`);
-    this.realtime.setPresence(client.id, {
+    await this.realtime.setPresence(client.id, {
       userId,
       name: user.name,
       avatarUrl: user.avatarUrl,
       workspaceSlug,
       projectSlug,
     });
-    this.realtime.emitPresenceUpdate(workspaceSlug);
+    await this.realtime.emitPresenceUpdate(workspaceSlug);
     return { ok: true };
   }
 
   @SubscribeMessage('presence:leave')
-  handlePresenceLeave(
+  async handlePresenceLeave(
     @ConnectedSocket() client: Socket,
-  ): { ok: boolean } {
-    const entry = this.realtime.removePresence(client.id);
+  ): Promise<{ ok: boolean }> {
+    const entry = await this.realtime.removePresence(client.id);
     if (entry) {
-      this.realtime.emitPresenceUpdate(entry.workspaceSlug);
+      await this.realtime.emitPresenceUpdate(entry.workspaceSlug);
     }
     return { ok: true };
   }
 
   /** Optional keepalive — presence is primarily driven by join/leave/disconnect. */
   @SubscribeMessage('presence:heartbeat')
-  handlePresenceHeartbeat(
+  async handlePresenceHeartbeat(
     @ConnectedSocket() client: Socket,
-  ): { ok: boolean } {
-    return { ok: Boolean(this.realtime.getPresence(client.id)) };
+  ): Promise<{ ok: boolean }> {
+    return { ok: await this.realtime.touchPresence(client.id) };
   }
 }

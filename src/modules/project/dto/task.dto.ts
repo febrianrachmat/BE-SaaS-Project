@@ -1,9 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -13,6 +16,8 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 import { TaskDependencyType, TaskPriority, TaskStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
@@ -166,6 +171,42 @@ export class MoveTaskDto {
   position!: number;
 }
 
+export class BulkTaskPatchDto {
+  @ApiPropertyOptional({ enum: TaskStatus })
+  @IsOptional()
+  @IsEnum(TaskStatus)
+  status?: TaskStatus;
+
+  @ApiPropertyOptional({ enum: TaskPriority })
+  @IsOptional()
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsUUID()
+  assigneeId?: string | null;
+}
+
+export class BulkTaskActionDto {
+  @ApiProperty({ type: [String], maxItems: 100 })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsUUID('4', { each: true })
+  taskIds!: string[];
+
+  @ApiProperty({ enum: ['update', 'delete'] })
+  @IsIn(['update', 'delete'])
+  action!: 'update' | 'delete';
+
+  @ApiPropertyOptional({ type: BulkTaskPatchDto })
+  @ValidateIf((o: BulkTaskActionDto) => o.action === 'update')
+  @ValidateNested()
+  @Type(() => BulkTaskPatchDto)
+  patch?: BulkTaskPatchDto;
+}
+
 export class CalendarQueryDto {
   @ApiProperty({ example: '2026-07-01' })
   @IsDateString()
@@ -203,6 +244,16 @@ export class TaskQueryDto {
   @IsOptional()
   @IsUUID()
   assigneeId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  labelId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  cycleId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { NotificationType, Webhook } from '@prisma/client';
 import { WorkspaceContext } from '../../../common/decorators/current-workspace.decorator';
@@ -32,6 +33,9 @@ export const NOTIFICATION_TYPE_TO_WEBHOOK_EVENT: Partial<
   WORKSPACE_INVITE: 'workspace.invite',
 };
 
+const MAX_ATTEMPTS = 3;
+const BACKOFF_MS = [0, 500, 2000];
+
 function toWebhookDto(row: Webhook): WebhookDto {
   return {
     id: row.id,
@@ -45,6 +49,24 @@ function toWebhookDto(row: Webhook): WebhookDto {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function signPayload(secret: string, body: string): string {
+  return createHmac('sha256', secret).update(body).digest('hex');
+}
+
+/** Exported for tests / receivers verifying signatures. */
+export function verifyWebhookSignature(
+  secret: string,
+  body: string,
+  signatureHeader: string,
+): boolean {
+  const expected = signPayload(secret, body);
+  const provided = signatureHeader.replace(/^sha256=/, '');
+  const a = Buffer.from(expected, 'utf8');
+  const b = Buffer.from(provided, 'utf8');
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 @Injectable()
@@ -156,21 +178,42 @@ export class WebhookService {
     });
     if (hooks.length === 0) return;
 
+    const timestamp = Math.floor(Date.now() / 1000).toString();
     const body = JSON.stringify({
       event,
       workspaceSlug: workspaceSlug ?? null,
       data: data ?? null,
+      timestamp,
     });
 
     await Promise.allSettled(
-      hooks.map(async (hook) => {
+      hooks.map((hook) => this.deliverWithRetry(hook, event, body, timestamp)),
+    );
+  }
+
+  private async deliverWithRetry(
+    hook: Webhook,
+    event: string,
+    body: string,
+    timestamp: string,
+  ): Promise<void> {
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const delay = BACKOFF_MS[attempt] ?? 0;
+      if (delay > 0) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
+
+      try {
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           'User-Agent': 'FlowPilot-Webhooks/1.0',
           'X-FlowPilot-Event': event,
+          'X-FlowPilot-Timestamp': timestamp,
+          'X-FlowPilot-Delivery-Attempt': String(attempt + 1),
         };
         if (hook.secret) {
-          headers['X-FlowPilot-Secret'] = hook.secret;
+          const signature = signPayload(hook.secret, `${timestamp}.${body}`);
+          headers['X-FlowPilot-Signature'] = `sha256=${signature}`;
         }
 
         const res = await fetch(hook.url, {
@@ -180,18 +223,29 @@ export class WebhookService {
           signal: AbortSignal.timeout(10_000),
         });
 
-        if (!res.ok) {
-          this.logger.warn(
-            `Webhook ${hook.id} responded ${res.status} for ${event}`,
-          );
+        if (res.ok) {
+          await this.prisma.webhook.update({
+            where: { id: hook.id },
+            data: { lastFiredAt: new Date() },
+          });
+          return;
         }
 
-        await this.prisma.webhook.update({
-          where: { id: hook.id },
-          data: { lastFiredAt: new Date() },
-        });
-      }),
-    );
+        this.logger.warn(
+          `Webhook ${hook.id} responded ${res.status} for ${event} (attempt ${attempt + 1})`,
+        );
+        // Retry only on 5xx / 429
+        if (res.status < 500 && res.status !== 429) {
+          return;
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Webhook ${hook.id} network error for ${event} (attempt ${attempt + 1}): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
   }
 
   private async requireWebhook(

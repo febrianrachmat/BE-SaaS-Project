@@ -4,6 +4,7 @@ import { NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { RealtimeService } from '../../realtime/realtime.service';
 import { MailService } from '../../auth/services/mail.service';
+import { MailOutboxService } from '../../auth/services/mail-outbox.service';
 import {
   NotificationPrefsDto,
   NotificationPrefsService,
@@ -42,6 +43,7 @@ export class NotificationService {
     private readonly realtime: RealtimeService,
     private readonly prefs: NotificationPrefsService,
     private readonly mail: MailService,
+    private readonly mailOutbox: MailOutboxService,
     private readonly config: ConfigService,
     @Optional() @Inject(WebhookService)
     private readonly webhooks?: WebhookService,
@@ -184,18 +186,22 @@ export class NotificationService {
       if (!user?.email) return false;
 
       const actionUrl = this.buildActionUrl(input);
-      await this.mail.sendNotificationEmail({
-        to: user.email,
-        subject: `FlowPilot: ${input.title}`,
-        title: input.title,
-        body: input.body,
-        actionUrl,
-        actionLabel: 'Open in FlowPilot',
+      const to = user.email;
+      const title = input.title;
+      const body = input.body;
+      return this.mailOutbox.enqueue(async () => {
+        await this.mail.sendNotificationEmail({
+          to,
+          subject: `FlowPilot: ${title}`,
+          title,
+          body,
+          actionUrl,
+          actionLabel: 'Open in FlowPilot',
+        });
       });
-      return true;
     } catch (err) {
       this.logger.warn(
-        `Failed to email notification to ${input.userId}: ${
+        `Failed to queue notification email to ${input.userId}: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );

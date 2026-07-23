@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthController } from './controllers/auth.controller';
 import { PasswordService } from './services/password.service';
 import { MailService } from './services/mail.service';
+import { MailOutboxService } from './services/mail-outbox.service';
 import { TokenService } from './services/token.service';
 import { UserRepository } from './repositories/user.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
@@ -34,6 +35,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
   providers: [
     PasswordService,
     MailService,
+    MailOutboxService,
     TokenService,
     NotificationPrefsService,
     UserRepository,
@@ -60,6 +62,12 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
       useClass: JwtAuthGuard,
     },
   ],
-  exports: [TokenService, UserRepository, MailService, NotificationPrefsService],
+  exports: [
+    TokenService,
+    UserRepository,
+    MailService,
+    MailOutboxService,
+    NotificationPrefsService,
+  ],
 })
 export class AuthModule {}

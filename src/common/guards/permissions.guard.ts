@@ -48,6 +48,7 @@ export class PermissionsGuard implements CanActivate {
       user?: AuthUser;
       params: { slug?: string; workspaceSlug?: string };
       workspaceContext?: WorkspaceContext;
+      apiKeyAuth?: { apiKeyId: string; workspaceId: string };
     }>();
 
     const user = request.user;
@@ -55,12 +56,11 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Authentication required');
     }
 
-    if (user.systemRole === 'SYSTEM_ADMIN') {
-      return true;
-    }
-
     const slug = request.params.slug ?? request.params.workspaceSlug;
     if (!slug) {
+      // Non-workspace routes (e.g. /notifications) — allow authenticated user
+      if (!required || required.length === 0) return true;
+      if (user.systemRole === 'SYSTEM_ADMIN') return true;
       throw new ForbiddenException('Workspace slug is required');
     }
 
@@ -71,6 +71,25 @@ export class PermissionsGuard implements CanActivate {
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
+    }
+
+    if (
+      request.apiKeyAuth &&
+      request.apiKeyAuth.workspaceId !== workspace.id
+    ) {
+      throw new ForbiddenException(
+        'API key is not valid for this workspace',
+      );
+    }
+
+    if (user.systemRole === 'SYSTEM_ADMIN' && !request.apiKeyAuth) {
+      request.workspaceContext = {
+        workspaceId: workspace.id,
+        slug: workspace.slug,
+        role: 'OWNER' as WorkspaceRole,
+        membershipId: 'system-admin',
+      };
+      return true;
     }
 
     const membership = await this.prisma.workspaceMember.findFirst({

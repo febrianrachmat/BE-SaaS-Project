@@ -12,6 +12,7 @@ import {
   TaskStatus,
 } from '@prisma/client';
 import {
+  BulkTaskActionDto,
   CreateChecklistItemDto,
   CreateLabelDto,
   CreateTaskDto,
@@ -24,6 +25,11 @@ import {
   UpdateLabelDto,
   UpdateTaskDto,
 } from '../dto/task.dto';
+import {
+  PERMISSIONS,
+  roleHasPermission,
+  WorkspaceRoleName,
+} from '../../../common/constants/rbac';
 import { TaskRepository } from '../repositories/task.repository';
 import { ProjectService } from './project.service';
 import {
@@ -419,6 +425,57 @@ export class TaskService {
     });
   }
 
+  async bulk(
+    ctx: WorkspaceContext,
+    projectSlug: string,
+    actorId: string,
+    dto: BulkTaskActionDto,
+  ): Promise<{ updated: number; deleted: number }> {
+    const uniqueIds = [...new Set(dto.taskIds)];
+
+    if (dto.action === 'delete') {
+      if (
+        !roleHasPermission(
+          ctx.role as WorkspaceRoleName,
+          PERMISSIONS.TASK_DELETE,
+        )
+      ) {
+        throw new ForbiddenException('Insufficient permissions to delete tasks');
+      }
+      let deleted = 0;
+      for (const taskId of uniqueIds) {
+        await this.remove(ctx, projectSlug, taskId, actorId);
+        deleted += 1;
+      }
+      return { updated: 0, deleted };
+    }
+
+    const patch = dto.patch;
+    if (
+      !patch ||
+      (patch.status === undefined &&
+        patch.priority === undefined &&
+        patch.assigneeId === undefined)
+    ) {
+      throw new BadRequestException(
+        'patch with status, priority, or assigneeId is required for update',
+      );
+    }
+
+    let updated = 0;
+    for (const taskId of uniqueIds) {
+      await this.update(ctx, projectSlug, taskId, actorId, {
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+        ...(patch.assigneeId !== undefined
+          ? { assigneeId: patch.assigneeId }
+          : {}),
+      });
+      updated += 1;
+    }
+    return { updated, deleted: 0 };
+  }
+
   async calendar(
     ctx: WorkspaceContext,
     query: CalendarQueryDto,
@@ -507,6 +564,10 @@ export class TaskService {
         project: {
           select: { id: true, name: true, slug: true, icon: true },
         },
+        blocking: {
+          where: { type: TaskDependencyType.BLOCKS },
+          select: { toTaskId: true },
+        },
       },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
     });
@@ -515,6 +576,7 @@ export class TaskService {
       ...toTaskDto(row),
       // Timeline bar start: createdAt when no dedicated start date exists
       startDate: row.createdAt.toISOString(),
+      blocksTaskIds: row.blocking.map((edge) => edge.toTaskId),
       project: row.project,
     }));
   }
